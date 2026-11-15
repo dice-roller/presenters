@@ -67,3 +67,73 @@ Pool and group descriptions are displayed once alongside their results. Inline
 descriptions follow the pool or group; block descriptions sit above it and wrap
 as needed. Set `showDescriptions: false` to hide them. The local demo includes
 nested examples and a matching appearance control.
+
+## Selecting dice
+
+Each rendered die has `data-*` attributes on its enclosing `<g>`, covering its
+SVG, caption and modifier markers. The die type is the core factory name
+(`standard`, `percentile`, `fudge`, `range`, `face`, or a registered custom name).
+The shape describes the artwork actually used, independently of the die type.
+Face counts come directly from the core snapshot: for example, default `dF`
+currently has three equally likely faces and uses the d6 artwork.
+
+| Attribute                          | Value                                                           |
+| ---------------------------------- | --------------------------------------------------------------- |
+| `data-die-type`                    | Core die factory name                                           |
+| `data-faces`                       | Face count, including repeated faces                            |
+| `data-notation`                    | Die notation, such as `d20`, `d%`, or `dF`                      |
+| `data-shape`                       | Artwork key, such as `d20`, `d6`, or `generic`                  |
+| `data-min`, `data-max`             | Lowest and highest possible values                              |
+| `data-value`, `data-initial-value` | Final and original rolled values                                |
+| `data-calculation-value`           | Value used for scoring before exclusion                         |
+| `data-use-in-total`                | The die's own inclusion state (`true` / `false`)                |
+| `data-excluded`                    | Effective exclusion, including a dropped enclosing group member |
+| `data-flags`                       | Space-separated modifier flags; empty if there are none         |
+
+```css
+[data-die-type="standard"][data-faces="20"] .die-outline {
+  stroke: rebeccapurple;
+}
+
+[data-flags~="explode"] .die-value {
+  font-weight: 800;
+}
+
+[data-excluded="true"] {
+  opacity: 0.3;
+}
+```
+
+```javascript
+const dice = document.querySelectorAll('[data-die-type="fudge"]');
+for (const die of dice) {
+  console.log(Number(die.dataset.value), Number(die.dataset.faces));
+}
+```
+
+Selectors work when the SVG is inserted inline in the document. Values remain
+in the metadata when `showValues` is false; that option only hides visible text.
+
+## Optional labels and totals
+
+These appearance options default to `true`. Set any to `false` to hide that
+part of the output; hidden labels do not reserve their usual layout space.
+
+| Option               | Controls                                              |
+| -------------------- | ----------------------------------------------------- |
+| `showDiceLabels`     | Die notation below each icon                          |
+| `showModifierLabels` | Modifier labels below dice and group modifier markers |
+| `showNotation`       | The supplied notation above each roll                 |
+| `showTotals`         | Individual roll totals and the history total          |
+
+```typescript
+const presenter = new SvgPresenter(artwork, {
+  showDiceLabels: false,
+  showModifierLabels: false,
+  showNotation: false,
+  showTotals: false,
+});
+```
+
+Tooltips, `data-*` attributes, exclusion styling and calculated results remain
+available independently of these visibility options.

@@ -312,3 +312,134 @@ test("group headings span the complete group including inline labels and drop ba
     );
   }
 });
+
+test("dice expose semantic types, face counts and their actual artwork independently", () => {
+  const svg = new Roll("d20 + d% + dF + d13").present(
+    new SvgPresenter(artwork, appearance),
+  );
+  for (const attributes of [
+    'data-die-type="standard" data-faces="20" data-notation="d20" data-shape="d20"',
+    'data-die-type="percentile" data-faces="100" data-notation="d%" data-shape="d10"',
+    'data-die-type="fudge" data-faces="3" data-notation="dF" data-shape="d6"',
+    'data-die-type="standard" data-faces="13" data-notation="d13" data-shape="generic"',
+  ])
+    assert.ok(svg.includes(attributes), attributes);
+  const custom = new SvgPresenter(artwork, appearance).present(
+    sampleResult.rolls[7]!,
+  );
+  assert.ok(
+    custom.includes(
+      'data-die-type="face" data-faces="2" data-notation="d{10,20}" data-shape="d2"',
+    ),
+  );
+});
+
+test("metadata keeps numeric values, flags and effective exclusion when visible values are hidden", () => {
+  const svg = new SvgPresenter(artwork, {
+    ...appearance,
+    showValues: false,
+  }).present(sampleResult);
+  const dice = [
+    ...svg.matchAll(/<g class="(?:included|excluded)"( data-die-type=[^>]+)>/g),
+  ].map((match) => match[1]!);
+  assert.ok(
+    dice.some(
+      (data) =>
+        data.includes('data-value="6"') &&
+        data.includes('data-flags="explode"'),
+    ),
+  );
+  assert.ok(
+    dice.some(
+      (data) =>
+        data.includes('data-value="5"') &&
+        data.includes('data-initial-value="1"') &&
+        data.includes('data-flags="re-roll"'),
+    ),
+  );
+  assert.ok(
+    dice.some(
+      (data) =>
+        data.includes('data-use-in-total="true"') &&
+        data.includes('data-excluded="true"'),
+    ),
+  );
+  assert.ok(
+    dice.some(
+      (data) =>
+        data.includes('data-calculation-value="-1"') &&
+        data.includes('data-flags="target-failure"'),
+    ),
+  );
+});
+
+test("custom die names and notation are escaped in metadata attributes", () => {
+  const result = new Roll("d6").result;
+  assert.equal(result.type, "pool");
+  if (result.type !== "pool") return;
+  const unsafe = 'custom" onload="alert(1)<&';
+  const svg = new SvgPresenter(artwork, appearance).present({
+    notation: "Custom die",
+    total: result.value,
+    result: {
+      ...result,
+      node: { ...result.node, die: { ...result.node.die, name: unsafe } },
+      die: { ...result.die, notation: unsafe },
+    },
+  });
+  assert.ok(!svg.includes(' onload="'));
+  assert.ok(
+    svg.includes('data-die-type="custom&quot; onload=&quot;alert(1)&lt;&amp;"'),
+  );
+});
+
+test("label, notation and total visibility options work independently for rolls and histories", () => {
+  for (const target of [sampleRoll, sampleResult]) {
+    const before = JSON.stringify(target);
+    const baseline = new SvgPresenter(artwork, appearance).present(target);
+    for (let combination = 0; combination < 16; combination++) {
+      const options = {
+        showDiceLabels: Boolean(combination & 1),
+        showModifierLabels: Boolean(combination & 2),
+        showNotation: Boolean(combination & 4),
+        showTotals: Boolean(combination & 8),
+      };
+      const svg = new SvgPresenter(artwork, {
+        ...appearance,
+        ...options,
+      }).present(target);
+      assert.equal(
+        /<text[^>]*class="caption"/.test(svg),
+        options.showDiceLabels,
+      );
+      assert.equal(
+        /<text[^>]*class="badge"/.test(svg),
+        options.showModifierLabels,
+      );
+      assert.equal(
+        /<text[^>]*class="notation"/.test(svg),
+        options.showNotation,
+      );
+      assert.equal(/<text[^>]*class="total"/.test(svg), options.showTotals);
+      assert.equal(
+        svg.includes("History total:"),
+        "rolls" in target && options.showTotals,
+      );
+      assert.equal(
+        (svg.match(/data-die-type=/g) ?? []).length,
+        (baseline.match(/data-die-type=/g) ?? []).length,
+      );
+      assert.ok(svg.includes('data-flags="explode"'));
+      assert.ok(svg.includes("; explode</title>"));
+      if (!options.showModifierLabels)
+        assert.doesNotMatch(svg, /class="math"[^>]*>\(drop\)<\/text>/);
+      if (combination === 0)
+        assert.ok(
+          Number(svg.match(/height="([\d.]+)"/)![1]) <
+            Number(baseline.match(/height="([\d.]+)"/)![1]),
+        );
+      if (combination === 15) assert.equal(svg, baseline);
+    }
+    assert.equal(JSON.stringify(target), before);
+  }
+});

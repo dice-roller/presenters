@@ -11,6 +11,10 @@ const fill = ref("#eee7fb");
 const filled = ref(false);
 const showValues = ref(true);
 const showDescriptions = ref(true);
+const showDiceLabels = ref(true);
+const showModifierLabels = ref(true);
+const showNotation = ref(true);
+const showTotals = ref(true);
 const sizes = {
   "x-small": 40,
   small: 80,
@@ -49,6 +53,10 @@ const presenter = computed(
       filled: filled.value,
       showValues: showValues.value,
       showDescriptions: showDescriptions.value,
+      showDiceLabels: showDiceLabels.value,
+      showModifierLabels: showModifierLabels.value,
+      showNotation: showNotation.value,
+      showTotals: showTotals.value,
     }),
 );
 const singlePreview = computed(() => presenter.value.present(sampleRoll));
@@ -83,6 +91,18 @@ const preview = computed(() => presenter.value.present(sampleResult));
         ><input v-model="showDescriptions" type="checkbox" /> Show
         descriptions</label
       >
+      <label
+        ><input v-model="showDiceLabels" type="checkbox" /> Show dice
+        labels</label
+      >
+      <label
+        ><input v-model="showModifierLabels" type="checkbox" /> Show modifier
+        labels</label
+      >
+      <label
+        ><input v-model="showNotation" type="checkbox" /> Show notation</label
+      >
+      <label><input v-model="showTotals" type="checkbox" /> Show totals</label>
     </fieldset>
 
     <section
@@ -111,7 +131,7 @@ const preview = computed(() => presenter.value.present(sampleResult));
             v-html="fillValueSlot(icon.markup, showValues ? icon.value : '')"
           />
         </svg>
-        <figcaption>{{ icon.label }}</figcaption>
+        <figcaption v-if="showDiceLabels">{{ icon.label }}</figcaption>
       </figure>
     </section>
 
@@ -201,6 +221,8 @@ p {
   max-width: 70ch;
 }
 .controls {
+  position: sticky;
+  top: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
@@ -209,6 +231,7 @@ p {
   padding: 20px;
   border: 1px solid #655970;
   border-radius: 12px;
+  background-color: var(--page-bg);
 }
 .controls label {
   display: flex;

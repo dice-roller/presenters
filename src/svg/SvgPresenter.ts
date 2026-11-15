@@ -22,6 +22,10 @@ export interface Appearance {
   readonly filled: boolean;
   readonly showValues: boolean;
   readonly showDescriptions?: boolean;
+  readonly showDiceLabels?: boolean;
+  readonly showModifierLabels?: boolean;
+  readonly showNotation?: boolean;
+  readonly showTotals?: boolean;
 }
 
 type Token =
@@ -84,8 +88,15 @@ function tokens(
   excluded = false,
   minimum = 0,
   showDescriptions = true,
+  showModifierLabels = true,
 ): Token[] {
-  const body = expressionTokens(result, excluded, minimum, showDescriptions);
+  const body = expressionTokens(
+    result,
+    excluded,
+    minimum,
+    showDescriptions,
+    showModifierLabels,
+  );
   const description =
     result.type === "pool" || result.type === "group"
       ? result.node.description
@@ -109,9 +120,10 @@ function expressionTokens(
   excluded = false,
   minimum = 0,
   showDescriptions = true,
+  showModifierLabels = true,
 ): Token[] {
   const visit = (node: ExpressionResult, dropped = excluded, precedence = 0) =>
-    tokens(node, dropped, precedence, showDescriptions);
+    tokens(node, dropped, precedence, showDescriptions, showModifierLabels);
   const text = (value: string): Token => ({ kind: "text", value, excluded });
   const join = (
     items: readonly ExpressionResult[],
@@ -156,7 +168,7 @@ function expressionTokens(
           return [
             ...(index ? [text(",")] : []),
             ...visit(member.result, dropped),
-            ...(markers(member)
+            ...(showModifierLabels && markers(member)
               ? [
                   {
                     kind: "text" as const,
@@ -204,7 +216,19 @@ export function renderSvg(
   const padding = 24;
   const font = Math.max(14, Math.min(32, size * 0.2));
   const caption = Math.max(10, Math.min(16, size * 0.12));
-  const lineHeight = size + caption * 3 + 28;
+  const showDiceLabels = appearance.showDiceLabels !== false;
+  const showModifierLabels = appearance.showModifierLabels !== false;
+  const showNotation = appearance.showNotation !== false;
+  const showTotals = appearance.showTotals !== false;
+  const lineHeight =
+    size +
+    12 +
+    (showDiceLabels ? caption + 4 : 0) +
+    (showModifierLabels
+      ? showDiceLabels
+        ? caption * 2 + 12
+        : caption + 4
+      : 0);
   let y = padding;
   const output: string[] = [];
   const label = (
@@ -356,6 +380,7 @@ export function renderSvg(
       axis: token.kind === "die" ? size / 2 : font / 2,
       paint: (x, y) => {
         const content: string[] = [];
+        let data = "";
         if (token.kind === "text") {
           content.push(
             label(
@@ -375,8 +400,25 @@ export function renderSvg(
             : pool.die.faceCount === 100
               ? "d10"
               : `d${pool.die.faceCount}`;
+          const shape = artwork[key] ? key : "generic";
           const template = artwork[key] ?? artwork.generic;
           if (!template) throw new Error("Missing generic dice artwork");
+          data = Object.entries({
+            "die-type": pool.node.die.name,
+            faces: pool.die.faceCount,
+            notation: `d${pool.die.notation}`,
+            shape,
+            min: pool.die.min,
+            max: pool.die.max,
+            value: die.value,
+            "initial-value": die.initialValue,
+            "calculation-value": die.calculationValue,
+            "use-in-total": die.useInTotal,
+            excluded: token.excluded,
+            flags: die.flags.join(" "),
+          })
+            .map(([name, value]) => ` data-${name}="${escape(String(value))}"`)
+            .join("");
           const value = fudge
             ? die.value < 0
               ? "−"
@@ -396,26 +438,27 @@ export function renderSvg(
               `<path d="M${dieX + size * 0.14} ${y + size * 0.5}h${size * 0.72}" stroke="currentColor" stroke-width="2"/>`,
             );
           const dieLabel = `d${pool.die.notation}`;
-          content.push(
-            label(
-              dieLabel.length > 22 ? dieLabel.slice(0, 21) + "…" : dieLabel,
-              dieX + size / 2,
-              y + size + caption + 4,
-              `class="caption" text-anchor="middle" font-size="${caption}"`,
-            ),
-          );
+          if (showDiceLabels)
+            content.push(
+              label(
+                dieLabel.length > 22 ? dieLabel.slice(0, 21) + "…" : dieLabel,
+                dieX + size / 2,
+                y + size + caption + 4,
+                `class="caption" text-anchor="middle" font-size="${caption}"`,
+              ),
+            );
           const badges = markers(die);
-          if (badges)
+          if (showModifierLabels && badges)
             content.push(
               label(
                 badges,
                 dieX + size / 2,
-                y + size + caption * 2 + 10,
+                y + size + (showDiceLabels ? caption * 2 + 10 : caption + 4),
                 `class="badge" text-anchor="middle" font-size="${Math.max(8, Math.min(caption, size / (badges.length * 0.65)))}"`,
               ),
             );
         }
-        return `<g class="${token.excluded ? "excluded" : "included"}">${content.join("")}</g>`;
+        return `<g class="${token.excluded ? "excluded" : "included"}"${data}>${content.join("")}</g>`;
       },
     };
   }
@@ -429,21 +472,32 @@ export function renderSvg(
       : roll.notation;
     // Wrap notation as text as well as wrapping the visual expression.
     const chunks = heading.match(/.{1,100}/g) ?? [heading];
-    for (const chunk of chunks) {
-      output.push(label(chunk, padding, y + 18, 'class="notation"'));
-      y += 24;
+    if (showNotation) {
+      for (const chunk of chunks) {
+        output.push(label(chunk, padding, y + 18, 'class="notation"'));
+        y += 24;
+      }
+      y += 14;
     }
-    y += 14;
     const expression = layout(
-      tokens(roll.result, false, 0, appearance.showDescriptions !== false),
+      tokens(
+        roll.result,
+        false,
+        0,
+        appearance.showDescriptions !== false,
+        showModifierLabels,
+      ),
       width - padding * 2,
     );
     output.push(expression.paint(padding, y));
-    // Leave room for the total’s ascenders even after a text-only wrapped row.
-    y += expression.height + 24;
-    output.push(label(`Total: ${roll.total}`, padding, y, 'class="total"'));
+    y += expression.height;
+    if (showTotals) {
+      // Leave room for the total’s ascenders even after a text-only wrapped row.
+      y += 24;
+      output.push(label(`Total: ${roll.total}`, padding, y, 'class="total"'));
+    }
     if (isHistory) {
-      y += 26;
+      y += showTotals ? 26 : 12;
       output.push(
         `<path d="M${padding} ${y}H${width - padding}" class="divider"/>`,
       );
@@ -451,12 +505,18 @@ export function renderSvg(
     }
     if (y <= start) throw new Error("Invalid layout");
   }
-  if (isHistory)
+  if (isHistory && showTotals)
     output.push(
       label(`History total: ${target.total}`, padding, y + 6, 'class="total"'),
     );
-  const height = y + (isHistory ? 30 : padding);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="result-preview" role="img" aria-label="Dice results preview" style="color:${appearance.stroke};font-family:system-ui,sans-serif"><title>Dice results preview</title><desc>Evaluated results with arithmetic, modifiers and individual dice. Excluded results are crossed out.</desc><style>.result-preview .die-outline{fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}.result-preview .math{fill:currentColor}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>${output.join("")}</svg>`;
+  const height = y + (isHistory && showTotals ? 30 : padding);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="result-preview" role="img" aria-label="Dice results" style="color:${appearance.stroke};font-family:system-ui,sans-serif">
+    <title>Dice results</title>
+    <desc>Evaluated results with arithmetic, modifiers and individual dice.</desc>
+    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}.result-preview .math{fill:currentColor}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
+    ${output.join("")}
+</svg>`;
 }
 
 /** Formats v6 rolls, histories and expression results without evaluating them. */
@@ -476,6 +536,10 @@ export class SvgPresenter implements Presenter<string> {
       filled: false,
       showValues: true,
       showDescriptions: true,
+      showDiceLabels: true,
+      showModifierLabels: true,
+      showNotation: true,
+      showTotals: true,
       ...appearance,
     });
   }
