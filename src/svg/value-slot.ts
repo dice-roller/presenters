@@ -22,8 +22,10 @@ export function fillValueSlot(svg: string, value: string | number): string {
       if (fontSize > 0 && maxWidth > 0 && text.length > 0) {
         // Conservative estimate: keeps common numeric values inside the face
         // without relying on browser font measurement. CSS can override the size.
+        // Plus/minus glyphs occupy less of the face than numerals.
+        const symbolScale = text === "+" || text === "−" ? 2 : 1;
         const fittedSize = Math.min(
-          fontSize,
+          fontSize * symbolScale,
           maxWidth / (Array.from(text).length * 0.7),
         );
         attributes = attributes.replace(

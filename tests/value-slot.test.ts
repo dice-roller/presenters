@@ -40,3 +40,10 @@ test("Fudge symbols and empty values retain the same slot", () => {
     assert.ok(fillValueSlot(icon("d6"), value).includes(`>${value}</text>`));
   }
 });
+
+test("Fudge plus and minus symbols are enlarged without changing numeric values", () => {
+  for (const value of ["+", "−"])
+    assert.match(fillValueSlot(icon("d6"), value), /font-size="44"/);
+  for (const value of [6, -1, ""])
+    assert.match(fillValueSlot(icon("d6"), value), /font-size="22"/);
+});

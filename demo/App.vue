@@ -1,20 +1,22 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { diceArtwork } from "./dice-artwork.js";
+import { SvgPresenter } from "../src/svg/index.js";
+import { sampleResult, sampleRoll } from "./presenter/sample-result.js";
 import { fillValueSlot } from "../src/svg/value-slot.js";
-import d2 from "../assets/dice/d2.svg?raw";
-import d4 from "../assets/dice/d4.svg?raw";
-import d6 from "../assets/dice/d6.svg?raw";
-import d8 from "../assets/dice/d8.svg?raw";
-import d10 from "../assets/dice/d10.svg?raw";
-import d12 from "../assets/dice/d12.svg?raw";
-import d20 from "../assets/dice/d20.svg?raw";
-import generic from "../assets/dice/generic.svg?raw";
+const { d2, d4, d6, d8, d10, d12, d20, generic } = diceArtwork;
 
 const stroke = ref("#7962b5");
 const fill = ref("#eee7fb");
 const filled = ref(false);
 const showValues = ref(true);
-const sizes = { "x-small": 40, small: 80, medium: 140, large: 200, "x-large": 400 } as const;
+const sizes = {
+  "x-small": 40,
+  small: 80,
+  medium: 140,
+  large: 200,
+  "x-large": 400,
+} as const;
 const size = ref<keyof typeof sizes>("medium");
 
 // Only trusted, repository-owned SVG assets are inserted as markup.
@@ -36,6 +38,19 @@ const icons = [
   { label: "dF · plus", svg: d6, value: "+" },
   { label: "Generic · d13", svg: generic, value: "13" },
 ].map((icon) => ({ ...icon, markup: artwork(icon.svg) }));
+
+const presenter = computed(
+  () =>
+    new SvgPresenter(diceArtwork, {
+      size: sizes[size.value],
+      stroke: stroke.value,
+      fill: fill.value,
+      filled: filled.value,
+      showValues: showValues.value,
+    }),
+);
+const singlePreview = computed(() => presenter.value.present(sampleRoll));
+const preview = computed(() => presenter.value.present(sampleResult));
 </script>
 
 <template>
@@ -53,7 +68,9 @@ const icons = [
       <label>
         Size
         <select v-model="size">
-          <option v-for="(_value, name) in sizes" :value="name">{{ name }}</option>
+          <option v-for="(_value, name) in sizes" :value="name">
+            {{ name }}
+          </option>
         </select>
       </label>
       <label>Outline colour <input v-model="stroke" type="color" /></label>
@@ -91,6 +108,47 @@ const icons = [
         <figcaption>{{ icon.label }}</figcaption>
       </figure>
     </section>
+
+    <section class="presenter-preview" aria-labelledby="single-roll-heading">
+      <h2 id="single-roll-heading">Single roll preview</h2>
+      <p>
+        <code>2d20! + 3d8kh</code>: one d20 explodes for an extra roll, and only
+        the highest d8 contributes to the total.
+      </p>
+      <div
+        class="preview-output"
+        tabindex="0"
+        aria-label="Scrollable single roll SVG result"
+        v-html="singlePreview"
+      />
+      <details>
+        <summary>Fixed single roll object</summary>
+        <pre>{{ JSON.stringify(sampleRoll, null, 2) }}</pre>
+      </details>
+    </section>
+
+    <section class="presenter-preview" aria-labelledby="presenter-heading">
+      <h2 id="presenter-heading">Presenter output preview</h2>
+      <p>
+        A fixed result object showing mixed dice, arithmetic, parentheses,
+        functions, custom dice, keep/drop, explosions, rerolls, targets and
+        criticals. Appearance changes reuse these results.
+      </p>
+      <p class="legend">
+        Crossed out = excluded · ! = explosion · r = reroll · CS / CF = critical
+        success / failure · score = contribution to the total.
+      </p>
+      <div
+        class="preview-output"
+        tabindex="0"
+        aria-label="Scrollable SVG results"
+        v-html="preview"
+      />
+      <details>
+        <summary>Fixed result object</summary>
+        <pre>{{ JSON.stringify(sampleResult, null, 2) }}</pre>
+      </details>
+    </section>
   </main>
 </template>
 
@@ -99,11 +157,24 @@ const icons = [
   --die-size: 140px;
   --die-fill: none;
 
+  --page-bg: #fff;
+  --page-text-color: #0a0a0a;
+  --card-bg: #f7f7f7;
+
   font-family: system-ui, sans-serif;
-  color: #ede9f4;
-  background: #17151e;
+  color: var(--page-text-color);
+  background: var(--page-bg);
   color-scheme: dark;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page-bg: #17151e;
+    --page-text-color: #ede9f4;
+    --card-bg: #211d2a;
+  }
+}
+
 body {
   margin: 0;
 }
@@ -157,9 +228,10 @@ input[type="color"] {
   margin: 0;
   padding: 24px 16px;
   color: #3b2c50;
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 14px;
 }
+
 .die {
   display: block;
   width: var(--die-size);
@@ -175,5 +247,35 @@ input[type="color"] {
 }
 figcaption {
   font-weight: 600;
+}
+
+.presenter-preview {
+  margin-top: 48px;
+}
+.preview-output {
+  overflow: auto;
+  padding: 12px;
+  background: var(--card-bg);
+  border-radius: 14px;
+}
+.preview-output > svg {
+  display: block;
+}
+.legend {
+  color: #d4c8e1;
+  font-size: 0.9rem;
+}
+details {
+  margin-top: 20px;
+}
+summary {
+  cursor: pointer;
+}
+pre {
+  overflow: auto;
+  max-height: 420px;
+  padding: 16px;
+  background: #211d2a;
+  border-radius: 10px;
 }
 </style>
