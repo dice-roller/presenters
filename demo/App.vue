@@ -181,6 +181,10 @@ const preview = computed(() => presenter.value.present(sampleResult));
         functions, custom dice, keep/drop, explosions, rerolls, targets and
         criticals. Appearance changes reuse these results.
       </p>
+      <p>
+        Hover a pool, an operator between pools, or a group brace to highlight
+        that part of the result. Only the most specific region is highlighted.
+      </p>
       <p class="legend">
         Faded and crossed out = excluded · burst = explosion · overlapping
         bursts = compound · piercing arrow = penetrate · circular arrow = reroll

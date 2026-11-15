@@ -9,6 +9,7 @@ import type { ModifierIconPosition } from "./modifier-icons.js";
 
 let presentationSequence = 0;
 import { fillValueSlot } from "./value-slot.js";
+import { ast } from "@dice-roller/rpg-dice-roller";
 import type {
   ExpressionResult,
   HistoryData,
@@ -41,6 +42,13 @@ export interface Appearance {
 }
 
 type Token =
+  | {
+      kind: "group";
+      children: Token[];
+      result: Extract<ExpressionResult, { type: "group" }>;
+      excluded: boolean;
+    }
+  | { kind: "pool"; children: Token[]; result: PoolResult; excluded: boolean }
   | { kind: "member"; children: Token[]; item: ScoredItem; excluded: boolean }
   | { kind: "description"; value: string; excluded: boolean }
   | {
@@ -114,18 +122,25 @@ function tokens(
     result.type === "pool" || result.type === "group"
       ? result.node.description
       : undefined;
-  if (!showDescriptions || !description) return body;
-  return description.style === "block"
-    ? [
-        {
-          kind: "block",
-          scope: result.type === "group" ? "group" : "pool",
-          value: description.text,
-          children: body,
-          excluded,
-        },
-      ]
-    : [...body, { kind: "description", value: description.text, excluded }];
+  const described: Token[] =
+    !showDescriptions || !description
+      ? body
+      : description.style === "block"
+        ? [
+            {
+              kind: "block",
+              scope: result.type === "group" ? "group" : "pool",
+              value: description.text,
+              children: body,
+              excluded,
+            },
+          ]
+        : [...body, { kind: "description", value: description.text, excluded }];
+  return result.type === "pool"
+    ? [{ kind: "pool", children: described, result, excluded }]
+    : result.type === "group"
+      ? [{ kind: "group", children: described, result, excluded }]
+      : described;
 }
 
 function expressionTokens(
@@ -247,6 +262,8 @@ export function renderSvg(
     top: number,
     options = "",
   ) => `<text x="${x}" y="${top}" ${options}>${escape(value)}</text>`;
+  const hoverOutline = (x: number, y: number, width: number, height: number) =>
+    `<rect class="result-hover-outline" x="${x + 1}" y="${y + 1}" width="${Math.max(0, width - 2)}" height="${Math.max(0, height - 2)}" rx="6" pointer-events="none"/>`;
 
   interface Box {
     width: number;
@@ -260,6 +277,24 @@ export function renderSvg(
   // Descriptions wrap within their own pool/group, without shrinking the dice.
   const descriptionFont = Math.max(12, Math.min(16, caption));
   const descriptionLine = descriptionFont * 1.4;
+  // Inline comments use a proportional font. Treating every letter as a wide
+  // glyph leaves a conspicuous empty tail, especially for words like Alternative.
+  function inlineDescriptionWidth(text: string): number {
+    return [...text].reduce((width, character) => {
+      const em = /\s/.test(character)
+        ? 0.32
+        : /[ilI.,'!|]/.test(character)
+          ? 0.28
+          : /[ftr()\[\]]/.test(character)
+            ? 0.4
+            : /[mwMW@]/.test(character)
+              ? 0.9
+              : /[A-Z]/.test(character)
+                ? 0.7
+                : 0.6;
+      return width + em * descriptionFont;
+    }, 0);
+  }
   function wrapDescription(text: string, maxWidth: number): string[] {
     const limit = Math.max(1, Math.floor(maxWidth / (descriptionFont * 0.65)));
     return text.split(/\r\n|[\n\r\u2028\u2029]/).flatMap((paragraph) => {
@@ -336,6 +371,39 @@ export function renderSvg(
   }
 
   function measure(token: Token, available: number): Box {
+    if (token.kind === "group") {
+      const child = layout(token.children, available);
+      const group = token.result;
+      const notation = ast.nodeToNotation({
+        ...group.node,
+        description: undefined,
+      });
+      const counted = group.members.filter(
+        (member) => member.useInTotal,
+      ).length;
+      const details = `Roll group: ${notation}; ${group.members.length} members; ${counted} counted; total ${group.value}${token.excluded ? "; excluded by enclosing group" : ""}`;
+      return {
+        ...child,
+        paint: (x, y) =>
+          `<g class="roll-group-result" data-group="true" data-notation="${escape(notation)}" data-member-count="${group.members.length}" data-counted-count="${counted}" data-value="${group.value}"><title>${escape(details)}</title><rect class="roll-group-hit-area" x="${x}" y="${y}" width="${child.width}" height="${child.height}" fill="transparent" stroke="none" pointer-events="all"/>${hoverOutline(x, y, child.width, child.height)}${child.paint(x, y)}</g>`,
+      };
+    }
+    if (token.kind === "pool") {
+      const child = layout(token.children, available);
+      const pool = token.result;
+      const notation = ast.nodeToNotation({
+        ...pool.node,
+        description: undefined,
+      });
+      const counted = pool.rolls.filter((roll) => roll.useInTotal).length;
+      const details = `Dice pool: ${notation}; ${pool.rolls.length} ${pool.rolls.length === 1 ? "result" : "results"}; ${counted} counted; total ${pool.value}${token.excluded ? "; excluded by enclosing group" : ""}`;
+      return {
+        ...child,
+        paint: (x, y) =>
+          // Keep the hit area behind children: dice and icons own their tooltips.
+          `<g class="dice-pool-result" data-pool="true" data-notation="${escape(notation)}" data-quantity="${pool.qty.value}" data-result-count="${pool.rolls.length}" data-counted-count="${counted}" data-value="${pool.value}"><title>${escape(details)}</title><rect class="dice-pool-hit-area" x="${x}" y="${y}" width="${child.width}" height="${child.height}" fill="transparent" stroke="none" pointer-events="all"/>${hoverOutline(x, y, child.width, child.height)}${child.paint(x, y)}</g>`,
+      };
+    }
     if (token.kind === "member") {
       const names = visibleIcons(token.item.flags);
       const memberLabel = showModifierLabels ? markers(token.item) : "";
@@ -411,7 +479,7 @@ export function renderSvg(
             .join("");
           // Paint the hit area first, outside the artwork mask, so empty space
           // inherits this title while later dice/icons keep their own tooltips.
-          const hitArea = `<rect class="group-member-hit-area" x="${-icons.padding}" y="${-icons.top}" width="${memberWidth}" height="${memberHeight}" fill="transparent" stroke="none" pointer-events="all"/>`;
+          const hitArea = `<rect class="group-member-hit-area" x="${-icons.padding}" y="${-icons.top}" width="${memberWidth}" height="${memberHeight}" fill="transparent" stroke="none" pointer-events="all"/>${hoverOutline(-icons.padding, -icons.top, memberWidth, memberHeight)}`;
           return `<g class="group-member-result" data-group-member="true" data-flags="${escape(token.item.flags.join(" "))}" data-excluded="${token.excluded}" transform="translate(${x + icons.padding} ${y + icons.top})"><title>${escape(details)}</title>${hitArea}${mask}<g class="group-member-artwork"${mask ? ` mask="url(#${id})"` : ""}>${child.paint(0, 0)}</g><g class="modifier-flags${token.excluded ? " excluded" : ""}">${icons.items.map((icon) => renderModifierIcon(icon, nextId())).join("")}</g>${annotation}</g>`;
         },
       };
@@ -430,8 +498,13 @@ export function renderSvg(
       );
       const lines = wrapDescription(token.value, textWidth - 12);
       const labelWidth =
-        Math.max(...lines.map((line) => line.length * descriptionFont * 0.65)) +
-        12;
+        Math.max(
+          ...lines.map((line) =>
+            token.kind === "description"
+              ? inlineDescriptionWidth(line)
+              : line.length * descriptionFont * 0.65,
+          ),
+        ) + 12;
       const headingHeight = lines.length * descriptionLine + 6;
       // Pool headings follow their dice; group headings span the complete group.
       const centre = child
@@ -643,7 +716,7 @@ export function renderSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="result-preview" role="img" aria-label="Dice results" style="color:${appearance.stroke};font-family:system-ui,sans-serif">
     <title>Dice results</title>
     <desc>Evaluated results with arithmetic, modifiers and individual dice.</desc>
-    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}${modifierIconStyles}.result-preview .math{fill:currentColor}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
+    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}${modifierIconStyles}.result-preview .result-hover-outline{fill:var(--result-hover-color,currentColor);fill-opacity:0;stroke:var(--result-hover-color,currentColor);stroke-opacity:0;stroke-width:1;pointer-events:none}.result-preview :is(.dice-pool-result,.group-member-result,.roll-group-result):hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result):hover))>.result-hover-outline{fill-opacity:var(--result-hover-fill-opacity,.05);stroke-opacity:var(--result-hover-stroke-opacity,.45)}.result-preview .math{fill:currentColor}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
     ${output.join("")}
 </svg>`;
 }

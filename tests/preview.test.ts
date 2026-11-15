@@ -23,6 +23,55 @@ const appearance = {
   showValues: true,
 };
 
+test("hover regions follow nested groups, members and pools without intercepting their children", () => {
+  for (const modifierIconPosition of ["corner", "below"] as const) {
+    const svg = new Roll("{{d6 + d8, d10}, d4}kh1").present(
+      new SvgPresenter(artwork, {
+        ...appearance,
+        modifierIconPosition,
+        showModifierIcons: false,
+        showModifierLabels: false,
+      }),
+    );
+    assert.equal((svg.match(/class="roll-group-result"/g) ?? []).length, 2);
+    assert.equal((svg.match(/class="group-member-result"/g) ?? []).length, 4);
+    assert.equal((svg.match(/class="dice-pool-result"/g) ?? []).length, 4);
+    assert.equal((svg.match(/class="result-hover-outline"/g) ?? []).length, 10);
+    assert.equal((svg.match(/class="roll-group-hit-area"/g) ?? []).length, 2);
+    assert.match(svg, /data-group="true" data-notation="/);
+    assert.match(svg, /<title>Roll group:/);
+    assert.match(svg, /<title>Group member:/);
+    assert.match(svg, /<title>Dice pool:/);
+    for (const outline of svg.matchAll(
+      /<rect class="result-hover-outline"[^>]*>/g,
+    )) {
+      assert.ok(outline[0].includes('pointer-events="none"'));
+      const width = Number(outline[0].match(/width="([\d.]+)"/)![1]);
+      const height = Number(outline[0].match(/height="([\d.]+)"/)![1]);
+      assert.ok(width > 0 && height > 0);
+    }
+    // Suppression includes nested groups as well as pools and members.
+    assert.ok(
+      svg.includes(
+        ":hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result):hover))>.result-hover-outline",
+      ),
+    );
+  }
+});
+
+test("multi-pool group example exposes outlines at all three levels", () => {
+  const svg = new SvgPresenter(artwork, appearance).present(
+    sampleResult.rolls[18]!,
+  );
+  assert.equal((svg.match(/class="roll-group-result"/g) ?? []).length, 1);
+  assert.equal((svg.match(/class="group-member-result"/g) ?? []).length, 2);
+  assert.equal((svg.match(/class="dice-pool-result"/g) ?? []).length, 4);
+  assert.equal((svg.match(/class="result-hover-outline"/g) ?? []).length, 7);
+  assert.match(svg, /--result-hover-fill-opacity/);
+  assert.match(svg, /--result-hover-stroke-opacity/);
+  assert.ok(svg.includes("Total: 9"));
+});
+
 test("SvgPresenter plugs into real v6 rolls and histories without rolling again", () => {
   let calls = 0;
   const roll = new Roll("2d6", {
@@ -48,7 +97,7 @@ test("SvgPresenter plugs into real v6 rolls and histories without rolling again"
 test("fixed result preview renders dice, maths and modifier outcomes without changing data", () => {
   const before = JSON.stringify(sampleResult);
   const svg = renderSvg(sampleResult, artwork, appearance);
-  assert.equal(sampleResult.total, 338);
+  assert.equal(sampleResult.total, 347);
   for (const total of [149, 13, 16, 15, 2, 21, 10, 28])
     assert.ok(svg.includes(`Total: ${total}`));
   for (const value of [
@@ -86,7 +135,7 @@ test("preview uses the selected appearance, retains totals when values are hidde
   assert.ok(small.includes('width="40" height="40"'));
   assert.ok(large.includes('width="400" height="400"'));
   assert.ok(small.includes("fill:#eee7fb"));
-  assert.ok(small.includes("History total: 338"));
+  assert.ok(small.includes("History total: 347"));
   assert.ok(!/data-slot="value"[^>]*>[^<]+<\/text>/.test(small));
 });
 
@@ -858,4 +907,84 @@ test("hiding icons removes layout and masks regardless of position; invalid posi
       }).present(sampleRoll),
     /Invalid modifier icon position/,
   );
+});
+
+test("pool wrappers expose initial quantity, resulting dice and pool totals", () => {
+  const before = JSON.stringify(sampleRoll);
+  const svg = new SvgPresenter(artwork, appearance).present(sampleRoll);
+  const pools = svg.split('class="dice-pool-result"').slice(1);
+  assert.equal(pools.length, 2);
+  assert.match(
+    pools[0]!,
+    /data-pool="true" data-notation="2d20!" data-quantity="2" data-result-count="3" data-counted-count="3" data-value="38"/,
+  );
+  assert.match(
+    pools[0]!,
+    /<title>Dice pool: 2d20!; 3 results; 3 counted; total 38<\/title>/,
+  );
+  assert.match(
+    pools[1]!,
+    /data-notation="3d8kh1" data-quantity="3" data-result-count="3" data-counted-count="1" data-value="8"/,
+  );
+  assert.equal(JSON.stringify(sampleRoll), before);
+});
+
+test("pool hover areas sit behind dice and cover parentheses and descriptions", () => {
+  for (const size of [40, 140, 400]) {
+    const svg = new Roll("2d6 [Example]").present(
+      new SvgPresenter(artwork, { ...appearance, size }),
+    );
+    const pool = svg.split('class="dice-pool-result"')[1]!;
+    const hit = pool.match(
+      /<rect class="dice-pool-hit-area" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="transparent" stroke="none" pointer-events="all"\/>/,
+    )!;
+    assert.ok(hit);
+    assert.ok(pool.indexOf(hit[0]) < pool.indexOf('class="math"'));
+    assert.ok(pool.indexOf(hit[0]) < pool.indexOf('class="description"'));
+    assert.ok(pool.includes("<title>d6:"));
+    const [x, y, width, height] = hit.slice(1).map(Number) as [
+      number,
+      number,
+      number,
+      number,
+    ];
+    for (const math of pool.matchAll(
+      /<text x="([\d.]+)" y="([\d.]+)" class="math"/g,
+    )) {
+      assert.ok(Number(math[1]) >= x && Number(math[1]) <= x + width);
+      assert.ok(Number(math[2]) >= y && Number(math[2]) <= y + height);
+    }
+    for (const heading of pool.matchAll(/<tspan x="([\d.]+)" y="([\d.]+)"/g)) {
+      assert.ok(Number(heading[1]) >= x && Number(heading[1]) <= x + width);
+      assert.ok(Number(heading[2]) >= y && Number(heading[2]) <= y + height);
+    }
+  }
+});
+
+test("group exclusion and hidden labels preserve pool metadata and its own value", () => {
+  for (const modifierIconPosition of ["corner", "below"] as const) {
+    const svg = new SvgPresenter(artwork, {
+      ...appearance,
+      modifierIconPosition,
+      showValues: false,
+      showDiceLabels: false,
+      showModifierLabels: false,
+      showModifierIcons: false,
+      showDescriptions: false,
+      showNotation: false,
+      showTotals: false,
+    }).present(sampleResult.rolls[6]!);
+    assert.equal((svg.match(/data-group-member="true"/g) ?? []).length, 2);
+    assert.equal((svg.match(/data-pool="true"/g) ?? []).length, 2);
+    assert.equal((svg.match(/class="dice-pool-hit-area"/g) ?? []).length, 2);
+    assert.match(svg, /Group member: 7; contribution 0; drop/);
+    assert.match(
+      svg,
+      /Dice pool: d20; 1 result; 1 counted; total 7; excluded by enclosing group/,
+    );
+    assert.match(
+      svg,
+      /data-notation="d20" data-quantity="1" data-result-count="1" data-counted-count="1" data-value="7"/,
+    );
+  }
 });

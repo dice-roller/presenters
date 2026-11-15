@@ -399,6 +399,25 @@ function selectionGroup(name: "keep" | "drop"): ExpressionResult {
 }
 
 /** Fixed v6-shaped results. No RNG, parser or roll evaluator runs in the demo. */
+const multiPoolMembers = [
+  member(binary("+", pool("6", 6, [die(4)]), pool("8", 8, [die(5)]))),
+  member(
+    binary("+", pool("10", 10, [die(3)]), pool("4", 4, [die(2)])),
+    ["drop"],
+    false,
+  ),
+];
+const multiPoolGroup: ExpressionResult = {
+  type: "group",
+  value: 9,
+  members: multiPoolMembers,
+  node: {
+    type: "group",
+    expressions: multiPoolMembers.map((item) => item.result.node),
+    modifiers: [{ type: "modifier", name: "keep", end: "h", qty: 1 }],
+  },
+};
+
 const rolls = [
   {
     notation: "d2 + d4 + d6 + d8 + d10 + d12 + d20 + d% + 3dF + d13",
@@ -432,6 +451,7 @@ const rolls = [
   { notation: "{d6, d6}>=5f<=2cs=6cf=1", result: scoredGroup },
   { notation: "{2d6, 2d8}kh1", result: selectionGroup("keep") },
   { notation: "{2d6, 2d8}dl1", result: selectionGroup("drop") },
+  { notation: "{d6 + d8, d10 + d4}kh1", result: multiPoolGroup },
 ].map((roll) => ({ ...roll, total: roll.result.value }));
 
 export const sampleResult: SvgHistory = {

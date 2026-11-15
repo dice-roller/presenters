@@ -114,6 +114,65 @@ for (const die of dice) {
 Selectors work when the SVG is inserted inline in the document. Values remain
 in the metadata when `showValues` is false; that option only hides visible text.
 
+## Selecting dice pools
+
+Every pool has a `g.dice-pool-result` wrapper with `data-pool="true"`.
+It contains the pool's parentheses, dice and descriptions. A transparent hit area
+lets blank spaces show the pool tooltip; dice and modifier icons keep their own
+more specific tooltips. Pools inside a group member retain both nested wrappers.
+
+| Attribute            | Meaning                                                            |
+| -------------------- | ------------------------------------------------------------------ |
+| `data-notation`      | Canonical pool notation, including modifiers, without descriptions |
+| `data-quantity`      | Initial evaluated dice quantity                                    |
+| `data-result-count`  | Number of resulting dice, including generated and dropped results  |
+| `data-counted-count` | Results whose own `useInTotal` flag is true                        |
+| `data-value`         | Pool value after its own modifiers                                 |
+
+For example, a pool tooltip can show
+`Dice pool: 3d8kh1; 3 results; 1 counted; total 8`.
+Counts refer to the resulting snapshot, rather than discarded reroll attempts.
+A pool in a dropped group member retains its own value and counted results; its
+tooltip additionally notes exclusion by the enclosing group. The group member's
+tooltip reports its effective contribution. Metadata and hover areas remain
+available when visible labels, values, notation or totals are hidden.
+
+```javascript
+const pools = document.querySelectorAll('g[data-pool="true"]');
+```
+
+## Hover highlights
+
+Inline SVG highlights the most specific pool, group member or roll group under
+pointer hover with a faint fill and rounded outline. Hover a pool's dice or blank
+space for the pool highlight; hover an operator between pools for the member;
+hover group braces, commas or its description for the whole group. Ancestor
+highlights are suppressed while a nested region is hovered, including nested
+roll groups. Dice and modifier icons retain their own tooltips.
+
+Whole groups use `g.roll-group-result[data-group="true"]`, with `data-notation`,
+`data-member-count`, `data-counted-count` and `data-value`. These wrappers remain
+available when descriptions, labels, icons or totals are hidden.
+
+```css
+.result-preview {
+  --result-hover-color: currentColor;
+  --result-hover-fill-opacity: 0.05;
+  --result-hover-stroke-opacity: 0.45;
+}
+
+/* Hide visual highlights while retaining hover areas and tooltips. */
+.result-preview.no-highlights {
+  --result-hover-fill-opacity: 0;
+  --result-hover-stroke-opacity: 0;
+}
+```
+
+Highlight outlines do not intercept pointer events or reserve layout space.
+The SVG includes the CSS, using `:hover` and `:has()` in supporting browsers;
+external page styles can customise an SVG embedded inline. An SVG used through
+`<img>` does not expose these interactive regions to the containing page.
+
 ## Optional labels and totals
 
 These appearance options default to `true`. Set any to `false` to hide that
