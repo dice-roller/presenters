@@ -167,6 +167,68 @@ test("single rolls omit history numbering and totals, even when a history has on
   }
 });
 
+test("nested descriptions belong to their group or pool and can be hidden", () => {
+  const roll = new Roll(
+    "{d6 [First <choice>], d8 [Second]}kh1 [Outer\nSecond line] + d4 // Inline label",
+  );
+  const before = JSON.stringify(roll.result);
+  const shown = roll.present(new SvgPresenter(artwork, appearance));
+  const hidden = roll.present(
+    new SvgPresenter(artwork, { ...appearance, showDescriptions: false }),
+  );
+  for (const text of [
+    "First &lt;choice&gt;",
+    "Second",
+    "Outer",
+    "Second line",
+    "Inline label",
+  ])
+    assert.ok(shown.includes(`>${text}</tspan>`), text);
+  assert.ok(!shown.includes("<choice>"));
+  assert.ok(!hidden.includes('class="description"'));
+  assert.ok(shown.includes(`Total: ${roll.total}`));
+  assert.ok(hidden.includes(`Total: ${roll.total}`));
+  assert.equal(JSON.stringify(roll.result), before);
+});
+
+test("long descriptions wrap rather than shrinking dice or overlapping the total", () => {
+  const roll = new Roll(`d6 [${"A long description ".repeat(30)}]`);
+  for (const size of [40, 140, 400]) {
+    const shown = roll.present(
+      new SvgPresenter(artwork, { ...appearance, size }),
+    );
+    const hidden = roll.present(
+      new SvgPresenter(artwork, {
+        ...appearance,
+        size,
+        showDescriptions: false,
+      }),
+    );
+    const height = (svg: string) => Number(svg.match(/height="([\d.]+)"/)![1]);
+    assert.ok(height(shown) > height(hidden));
+    assert.ok(shown.includes(`width="${size}" height="${size}"`));
+    assert.ok((shown.match(/<tspan /g) ?? []).length > 1);
+  }
+});
+
+test("a text-only continuation row leaves space before the total", () => {
+  const svg = new SvgPresenter(artwork, { ...appearance, size: 400 }).present(
+    sampleResult.rolls[6]!,
+  );
+  const math = [
+    ...svg.matchAll(
+      /<text x="[\d.]+" y="([\d.]+)" class="math"[^>]*font-size="([\d.]+)"/g,
+    ),
+  ];
+  const bottom = Math.max(
+    ...math.map((match) => Number(match[1]) + Number(match[2]) / 2),
+  );
+  const totalBaseline = Number(
+    svg.match(/<text x="[\d.]+" y="([\d.]+)" class="total"/)![1],
+  );
+  assert.ok(totalBaseline - 20 >= bottom + 8);
+});
+
 test("single rolls end after their total, without a history divider or spacer", () => {
   const presenter = new SvgPresenter(artwork, appearance);
   const svg = presenter.present(sampleRoll);
@@ -177,4 +239,76 @@ test("single rolls end after their total, without a history divider or spacer", 
   );
   assert.equal(height - totalY, 24);
   assert.match(presenter.present(sampleResult), /<path[^>]*class="divider"/);
+});
+
+test("block descriptions are centred over their own dice, even when wider than the pool", () => {
+  for (const size of [40, 140, 400]) {
+    const roll = new Roll("d12 [Weapon damage] + d20 [Alternative]");
+    const svg = roll.present(
+      new SvgPresenter(artwork, { ...appearance, size }),
+    );
+    const dice = [...svg.matchAll(/<svg x="([\d.]+)" y="([\d.]+)" width="/g)];
+    const headings = [
+      ...svg.matchAll(
+        /<text class="description"[^>]*text-anchor="middle"><tspan x="([\d.]+)" y="([\d.]+)">/g,
+      ),
+    ];
+    assert.equal(headings.length, 2);
+    for (let i = 0; i < 2; i++) {
+      assert.ok(
+        Math.abs(Number(headings[i]![1]) - (Number(dice[i]![1]) + size / 2)) <
+          0.001,
+      );
+      assert.ok(Number(headings[i]![2]) < Number(dice[i]![2]));
+    }
+  }
+});
+
+test("nested group and pool descriptions each use the centre of their own scope", () => {
+  const roll = new Roll("{d12 [Weapon damage], d20} [Whole group]");
+  const svg = roll.present(new SvgPresenter(artwork, appearance));
+  const dice = [...svg.matchAll(/<svg x="([\d.]+)" y="([\d.]+)" width="/g)];
+  const headings = [
+    ...svg.matchAll(/<tspan x="([\d.]+)" y="([\d.]+)">([^<]+)<\/tspan>/g),
+  ];
+  const pool = headings.find((match) => match[3] === "Weapon damage")!;
+  const group = headings.find((match) => match[3] === "Whole group")!;
+  assert.ok(
+    Math.abs(Number(pool[1]) - (Number(dice[0]![1]) + appearance.size / 2)) <
+      0.001,
+  );
+  assert.ok(
+    Math.abs(
+      Number(group[1]) -
+        (Number(dice[0]![1]) + Number(dice[1]![1]) + appearance.size) / 2,
+    ) < 0.001,
+  );
+  assert.ok(Number(group[2]) < Number(pool[2]));
+});
+
+test("group headings span the complete group including inline labels and drop badges", () => {
+  for (const size of [40, 140]) {
+    const svg = new SvgPresenter(artwork, { ...appearance, size }).present(
+      sampleResult.rolls[6]!,
+    );
+    const heading = svg.match(
+      /<tspan x="([\d.]+)"[^>]*>Keep the higher result<\/tspan>/,
+    )!;
+    const math = [
+      ...svg.matchAll(
+        /<text x="([\d.]+)"[^>]*class="math"[^>]*>([^<]+)<\/text>/g,
+      ),
+    ];
+    const opening = Number(math.find((match) => match[2] === "{")![1]);
+    const closing = Number(math.find((match) => match[2] === "}")![1]);
+    assert.ok(Math.abs(Number(heading[1]) - (opening + closing) / 2) < 0.001);
+    const dice = [...svg.matchAll(/<svg x="([\d.]+)"[^>]*width="/g)];
+    const poolHeading = svg.match(
+      /<tspan x="([\d.]+)"[^>]*>Weapon damage<\/tspan>/,
+    )!;
+    assert.ok(
+      Math.abs(Number(poolHeading[1]) - (Number(dice[0]![1]) + size / 2)) <
+        0.001,
+    );
+  }
 });

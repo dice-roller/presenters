@@ -10,6 +10,7 @@ const stroke = ref("#7962b5");
 const fill = ref("#eee7fb");
 const filled = ref(false);
 const showValues = ref(true);
+const showDescriptions = ref(true);
 const sizes = {
   "x-small": 40,
   small: 80,
@@ -47,6 +48,7 @@ const presenter = computed(
       fill: fill.value,
       filled: filled.value,
       showValues: showValues.value,
+      showDescriptions: showDescriptions.value,
     }),
 );
 const singlePreview = computed(() => presenter.value.present(sampleRoll));
@@ -77,6 +79,10 @@ const preview = computed(() => presenter.value.present(sampleResult));
       <label>Fill colour <input v-model="fill" type="color" /></label>
       <label><input v-model="filled" type="checkbox" /> Fill dice</label>
       <label><input v-model="showValues" type="checkbox" /> Show values</label>
+      <label
+        ><input v-model="showDescriptions" type="checkbox" /> Show
+        descriptions</label
+      >
     </fieldset>
 
     <section

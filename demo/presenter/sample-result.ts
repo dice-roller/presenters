@@ -33,6 +33,7 @@ function pool(
   rolls: ReturnType<typeof die>[],
   modifiers: ast.ModifierNode[] = [],
   args?: number[],
+  description?: ast.DescriptionNode,
 ): PoolResult {
   const fudge = notation.startsWith("F");
   const name = fudge
@@ -68,6 +69,7 @@ function pool(
       qty: qty.node,
       die: { type: "die", name, args: dieArgs.map((arg) => arg.node) },
       modifiers,
+      ...(description ? { description } : {}),
     },
     qty,
     dieArgs,
@@ -242,13 +244,26 @@ const criticals = pool(
   ],
 );
 const members = [
-  member(pool("12", 12, [die(10)])),
-  member(pool("20", 20, [die(7)]), ["drop"], false),
+  member(
+    pool("12", 12, [die(10)], [], undefined, {
+      text: "Weapon damage",
+      style: "block",
+    }),
+  ),
+  member(
+    pool("20", 20, [die(7)], [], undefined, {
+      text: "Alternative",
+      style: "inline",
+    }),
+    ["drop"],
+    false,
+  ),
 ];
 const group: ExpressionResult = {
   type: "group",
   node: {
     type: "group",
+    description: { text: "Keep the higher result", style: "block" },
     expressions: members.map((item) => item.result.node),
     modifiers: [{ type: "modifier", name: "keep", end: "h", qty: 1 }],
   },
@@ -283,7 +298,11 @@ const rolls = [
   { notation: "d6! + d8r=1", result: binary("+", exploding, reroll) },
   { notation: "4d10>=8=10:2f=1", result: targets },
   { notation: "2d20cs=20cf=1", result: criticals },
-  { notation: "{d12, d20}kh1", result: group },
+  {
+    notation:
+      "{d12 [Weapon damage], d20 // Alternative\n}kh1 [Keep the higher result]",
+    result: group,
+  },
   { notation: "d{0:5} + d{1,1,2,3,5,8} + d{10,20}", result: custom },
 ].map((roll) => ({ ...roll, total: roll.result.value }));
 

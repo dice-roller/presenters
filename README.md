@@ -62,3 +62,8 @@ currently points to an older alpha with a different API.
 The development dependency temporarily uses `feature/next/prepare-git-installation`,
 a branch of `next` adding the package preparation hook needed for Git installs.
 Switch it to `next` once that packaging fix is merged.
+
+Pool and group descriptions are displayed once alongside their results. Inline
+descriptions follow the pool or group; block descriptions sit above it and wrap
+as needed. Set `showDescriptions: false` to hide them. The local demo includes
+nested examples and a matching appearance control.
