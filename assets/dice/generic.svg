@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+  class="die die-generic"
+  width="128" height="128" viewBox="0 0 100 100"
+  fill="none" stroke="currentColor" stroke-width="2.2"
+  stroke-linecap="round" stroke-linejoin="round"
+  role="img" aria-label="Die with an arbitrary number of faces">
+  <path class="die-outline"
+    d="M34 6H66Q69 6 71 8L92 29Q94 31 94 34V66Q94 69 92 71L71 92Q69 94 66 94H34Q31 94 29 92L8 71Q6 69 6 66V34Q6 31 8 29L29 8Q31 6 34 6Z"/>
+  <text class="die-value" data-slot="value"
+    x="50" y="50" text-anchor="middle" dominant-baseline="central"
+    font-size="22" data-max-width="64" fill="currentColor" stroke="none"></text>
+</svg>

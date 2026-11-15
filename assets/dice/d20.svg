@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+  class="die die-d20"
+  width="128" height="128" viewBox="0 0 100 100"
+  fill="none" stroke="currentColor" stroke-width="2.2"
+  stroke-linecap="round" stroke-linejoin="round"
+  role="img" aria-label="Twenty-sided die">
+  <path class="die-outline" d="M50 5 90 27 90 73 50 95 10 73 10 27Z"/>
+  <path class="die-facets" stroke-width="1.4"
+    d="M50 5V20
+       M10 27 50 20 90 27
+       M90 27 82 72 90 73
+       M82 72 50 95 18 72
+       M18 72 10 73
+       M10 27 18 72
+       M50 20 18 72H82Z"/>
+  <text class="die-value" data-slot="value"
+    x="50" y="54" text-anchor="middle" dominant-baseline="central"
+    font-size="22" data-max-width="36" fill="currentColor" stroke="none"></text>
+</svg>

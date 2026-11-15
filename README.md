@@ -15,11 +15,14 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. The Vue demo currently contains a preview
-placeholder, ready to connect to the SVG presenter during implementation.
+Open the local URL printed by Vite. The Vue demo shows the original dice icons
+with example values, including percentile and Fudge dice. Its appearance controls
+let you change the colours and toggle fills or values without changing the assets.
+The full roll presenter is still to be implemented.
 
 ```sh
 npm run typecheck
+npm test
 npm run build
 npm run check
 ```
