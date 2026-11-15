@@ -42,6 +42,7 @@ export interface Appearance {
 }
 
 type Token =
+  | { kind: "math-group"; children: Token[]; name?: string }
   | {
       kind: "group";
       children: Token[];
@@ -58,7 +59,12 @@ type Token =
       children: Token[];
       excluded: boolean;
     }
-  | { kind: "text"; value: string; excluded: boolean }
+  | {
+      kind: "text";
+      value: string;
+      excluded: boolean;
+      delimiter?: "function" | "open" | "close";
+    }
   | {
       kind: "die";
       pool: PoolResult;
@@ -153,6 +159,22 @@ function expressionTokens(
   const visit = (node: ExpressionResult, dropped = excluded, precedence = 0) =>
     tokens(node, dropped, precedence, showDescriptions, showModifierLabels);
   const text = (value: string): Token => ({ kind: "text", value, excluded });
+  const pair = (children: Token[], name?: string): Token[] => [
+    {
+      kind: "math-group",
+      name,
+      children: [
+        {
+          kind: "text",
+          value: `${name ?? ""}(`,
+          excluded,
+          delimiter: name ? "function" : "open",
+        },
+        ...children,
+        { kind: "text", value: ")", excluded, delimiter: "close" },
+      ],
+    },
+  ];
   const join = (
     items: readonly ExpressionResult[],
     separator: string,
@@ -179,13 +201,9 @@ function expressionTokens(
         text(")"),
       ];
     case "paren":
-      return [text("("), ...visit(result.inner, excluded), text(")")];
+      return pair(visit(result.inner, excluded));
     case "function":
-      return [
-        text(`${result.node.name}(`),
-        ...join(result.args, ","),
-        text(")"),
-      ];
+      return pair(join(result.args, ","), result.node.name);
     case "unary":
       return [text("−"), ...visit(result.operand, excluded, 3)];
     case "group":
@@ -215,7 +233,7 @@ function expressionTokens(
         text({ "*": "×", "/": "÷", "-": "−" }[op] ?? op),
         ...visit(result.right, excluded, precedence + (op === "^" ? 0 : 1)),
       ];
-      return precedence < minimum ? [text("("), ...body, text(")")] : body;
+      return precedence < minimum ? pair(body) : body;
     }
   }
 }
@@ -277,9 +295,9 @@ export function renderSvg(
   // Descriptions wrap within their own pool/group, without shrinking the dice.
   const descriptionFont = Math.max(12, Math.min(16, caption));
   const descriptionLine = descriptionFont * 1.4;
-  // Inline comments use a proportional font. Treating every letter as a wide
-  // glyph leaves a conspicuous empty tail, especially for words like Alternative.
-  function inlineDescriptionWidth(text: string): number {
+  // Comments and function names use a proportional font; equal-width character
+  // estimates leave conspicuous gaps after narrow letters.
+  function proportionalTextWidth(text: string, fontSize: number): number {
     return [...text].reduce((width, character) => {
       const em = /\s/.test(character)
         ? 0.32
@@ -292,7 +310,7 @@ export function renderSvg(
               : /[A-Z]/.test(character)
                 ? 0.7
                 : 0.6;
-      return width + em * descriptionFont;
+      return width + em * fontSize;
     }, 0);
   }
   function wrapDescription(text: string, maxWidth: number): string[] {
@@ -371,6 +389,14 @@ export function renderSvg(
   }
 
   function measure(token: Token, available: number): Box {
+    if (token.kind === "math-group") {
+      const child = layout(token.children, available);
+      return {
+        ...child,
+        paint: (x, y) =>
+          `<g class="math-group-result" data-math-group="${token.name ? "function" : "parentheses"}"${token.name ? ` data-function="${escape(token.name)}"` : ""}>${child.paint(x, y)}</g>`,
+      };
+    }
     if (token.kind === "group") {
       const child = layout(token.children, available);
       const group = token.result;
@@ -501,7 +527,7 @@ export function renderSvg(
         Math.max(
           ...lines.map((line) =>
             token.kind === "description"
-              ? inlineDescriptionWidth(line)
+              ? proportionalTextWidth(line, descriptionFont)
               : line.length * descriptionFont * 0.65,
           ),
         ) + 12;
@@ -542,7 +568,12 @@ export function renderSvg(
     const tokenWidth =
       token.kind === "die"
         ? size + icons.padding * 2
-        : Math.max(16, token.value.length * font * 0.62 + 10);
+        : Math.max(
+            16,
+            (token.delimiter === "function"
+              ? proportionalTextWidth(token.value, font)
+              : token.value.length * font * 0.62) + 10,
+          );
     return {
       width: tokenWidth,
       ...(token.kind === "die"
@@ -575,6 +606,13 @@ export function renderSvg(
               `class="math" text-anchor="middle" dominant-baseline="central" font-size="${font}"`,
             ),
           );
+          if (token.delimiter === "function") {
+            const name = token.value.slice(0, -1);
+            content[0] = content[0]!.replace(
+              `>${escape(token.value)}</text>`,
+              `><tspan class="math-function-name">${escape(name)}</tspan><tspan>(</tspan></text>`,
+            );
+          }
         } else {
           // Centre the artwork within its padded token, just like text tokens.
           const dieX = x + (tokenWidth - size) / 2;
@@ -660,7 +698,7 @@ export function renderSvg(
               ),
             );
         }
-        return `<g class="${token.excluded ? "excluded" : "included"}"${data}>${content.join("")}</g>`;
+        return `<g class="${token.excluded ? "excluded" : "included"}${token.kind === "text" && token.delimiter ? " math-delimiter" : ""}"${token.kind === "text" && token.delimiter ? ` data-delimiter="${token.delimiter}"` : ""}${data}>${content.join("")}</g>`;
       },
     };
   }
@@ -716,7 +754,7 @@ export function renderSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="result-preview" role="img" aria-label="Dice results" style="color:${appearance.stroke};font-family:system-ui,sans-serif">
     <title>Dice results</title>
     <desc>Evaluated results with arithmetic, modifiers and individual dice.</desc>
-    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}${modifierIconStyles}.result-preview .result-hover-outline{fill:var(--result-hover-color,currentColor);fill-opacity:0;stroke:var(--result-hover-color,currentColor);stroke-opacity:0;stroke-width:1;pointer-events:none}.result-preview :is(.dice-pool-result,.group-member-result,.roll-group-result):hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result):hover))>.result-hover-outline{fill-opacity:var(--result-hover-fill-opacity,.05);stroke-opacity:var(--result-hover-stroke-opacity,.45)}.result-preview .math{fill:currentColor}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
+    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}${modifierIconStyles}.result-preview .result-hover-outline{fill:var(--result-hover-color,currentColor);fill-opacity:0;stroke:var(--result-hover-color,currentColor);stroke-opacity:0;stroke-width:1;pointer-events:none}.result-preview :is(.dice-pool-result,.group-member-result,.roll-group-result):hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result):hover))>.result-hover-outline{fill-opacity:var(--result-hover-fill-opacity,.05);stroke-opacity:var(--result-hover-stroke-opacity,.45)}.result-preview .math{fill:currentColor}.result-preview .math-group-result:has(>.math-delimiter:hover)>.math-delimiter .math{fill:var(--math-hover-color,var(--result-hover-color,currentColor));filter:brightness(1.6)}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
     ${output.join("")}
 </svg>`;
 }

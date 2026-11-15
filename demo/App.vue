@@ -184,6 +184,8 @@ const preview = computed(() => presenter.value.present(sampleResult));
       <p>
         Hover a pool, an operator between pools, or a group brace to highlight
         that part of the result. Only the most specific region is highlighted.
+        Hover a function name or mathematical parenthesis to highlight its
+        matching pair.
       </p>
       <p class="legend">
         Faded and crossed out = excluded · burst = explosion · overlapping

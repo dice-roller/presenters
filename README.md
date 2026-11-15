@@ -173,6 +173,26 @@ The SVG includes the CSS, using `:hover` and `:has()` in supporting browsers;
 external page styles can customise an SVG embedded inline. An SVG used through
 `<img>` does not expose these interactive regions to the containing page.
 
+## Matching mathematical parentheses
+
+Hover a function name or either of its parentheses to brighten the name and both
+parentheses together. Hover either
+mathematical grouping parenthesis to brighten its matching partner. Arguments
+and nested pairs do not trigger the outer pair. Dice-pool parentheses retain
+only their existing pool highlight.
+
+This includes parentheses inserted by the presenter to preserve precedence.
+No font-size or weight changes are used, so the highlight does not shift text.
+Function and grouping scopes use `g.math-group-result` with `data-math-group`
+set to `function` or `parentheses`. Functions also expose `data-function`.
+These effects use CSS `:has()` and require an interactive SVG.
+
+```css
+.result-preview {
+  --math-hover-color: #bda0ff;
+}
+```
+
 ## Optional labels and totals
 
 These appearance options default to `true`. Set any to `false` to hide that

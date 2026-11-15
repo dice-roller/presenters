@@ -23,6 +23,61 @@ const appearance = {
   showValues: true,
 };
 
+test("functions and mathematical parentheses expose their own matching delimiters", () => {
+  const svg = new Roll("max(floor((d8+3)/2), (d4+1))").present(
+    new SvgPresenter(artwork, appearance),
+  );
+  assert.equal((svg.match(/data-math-group="function"/g) ?? []).length, 2);
+  assert.equal((svg.match(/data-math-group="parentheses"/g) ?? []).length, 2);
+  assert.equal((svg.match(/data-delimiter="function"/g) ?? []).length, 2);
+  assert.equal((svg.match(/data-delimiter="open"/g) ?? []).length, 2);
+  assert.equal((svg.match(/data-delimiter="close"/g) ?? []).length, 4);
+  assert.match(svg, /data-function="max"/);
+  assert.match(svg, /data-function="floor"/);
+  assert.match(
+    svg,
+    /<tspan class="math-function-name">floor<\/tspan><tspan>\(<\/tspan>/,
+  );
+  // Only hovering a direct delimiter activates its own pair, not outer pairs
+  // or argument contents. Text styling does not change font metrics.
+  assert.ok(
+    svg.includes(
+      ".math-group-result:has(>.math-delimiter:hover)>.math-delimiter .math{",
+    ),
+  );
+  assert.doesNotMatch(svg, /math-delimiter[^}]*font-weight/);
+  assert.equal((svg.match(/data-pool="true"/g) ?? []).length, 2);
+});
+
+test("dice-pool parentheses stay outside mathematical matching highlights", () => {
+  const svg = new SvgPresenter(artwork, appearance).present(sampleRoll);
+  assert.doesNotMatch(svg, /data-math-group=/);
+  assert.doesNotMatch(svg, /data-delimiter=/);
+  assert.equal((svg.match(/data-pool="true"/g) ?? []).length, 2);
+});
+
+test("parentheses inserted to preserve precedence are also matched", () => {
+  const result = new Roll("(1+2)*3").result;
+  assert.equal(result.type, "binary");
+  if (result.type !== "binary") return;
+  assert.equal(result.left.type, "paren");
+  if (result.left.type !== "paren") return;
+  const unwrapped = {
+    ...result,
+    left: result.left.inner,
+    node: { ...result.node, left: result.left.inner.node },
+  };
+  for (const size of [40, 140, 400]) {
+    const svg = new SvgPresenter(artwork, { ...appearance, size }).present(
+      unwrapped,
+    );
+    assert.equal((svg.match(/data-math-group="parentheses"/g) ?? []).length, 1);
+    assert.equal((svg.match(/data-delimiter="open"/g) ?? []).length, 1);
+    assert.equal((svg.match(/data-delimiter="close"/g) ?? []).length, 1);
+    assert.ok(svg.includes(`Total: ${result.value}`));
+  }
+});
+
 test("hover regions follow nested groups, members and pools without intercepting their children", () => {
   for (const modifierIconPosition of ["corner", "below"] as const) {
     const svg = new Roll("{{d6 + d8, d10}, d4}kh1").present(
@@ -97,7 +152,7 @@ test("SvgPresenter plugs into real v6 rolls and histories without rolling again"
 test("fixed result preview renders dice, maths and modifier outcomes without changing data", () => {
   const before = JSON.stringify(sampleResult);
   const svg = renderSvg(sampleResult, artwork, appearance);
-  assert.equal(sampleResult.total, 347);
+  assert.equal(sampleResult.total, 351);
   for (const total of [149, 13, 16, 15, 2, 21, 10, 28])
     assert.ok(svg.includes(`Total: ${total}`));
   for (const value of [
@@ -135,7 +190,7 @@ test("preview uses the selected appearance, retains totals when values are hidde
   assert.ok(small.includes('width="40" height="40"'));
   assert.ok(large.includes('width="400" height="400"'));
   assert.ok(small.includes("fill:#eee7fb"));
-  assert.ok(small.includes("History total: 347"));
+  assert.ok(small.includes("History total: 351"));
   assert.ok(!/data-slot="value"[^>]*>[^<]+<\/text>/.test(small));
 });
 

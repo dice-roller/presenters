@@ -418,6 +418,35 @@ const multiPoolGroup: ExpressionResult = {
   },
 };
 
+const nestedMaths = fn(
+  "max",
+  [
+    fn(
+      "floor",
+      [
+        binary(
+          "/",
+          paren(binary("+", pool("8", 8, [die(5)]), number(3))),
+          number(2),
+        ),
+      ],
+      4,
+    ),
+    fn(
+      "ceil",
+      [
+        binary(
+          "/",
+          paren(binary("+", pool("6", 6, [die(4)]), pool("4", 4, [die(3)]))),
+          number(3),
+        ),
+      ],
+      3,
+    ),
+  ],
+  4,
+);
+
 const rolls = [
   {
     notation: "d2 + d4 + d6 + d8 + d10 + d12 + d20 + d% + 3dF + d13",
@@ -452,6 +481,10 @@ const rolls = [
   { notation: "{2d6, 2d8}kh1", result: selectionGroup("keep") },
   { notation: "{2d6, 2d8}dl1", result: selectionGroup("drop") },
   { notation: "{d6 + d8, d10 + d4}kh1", result: multiPoolGroup },
+  {
+    notation: "max(floor((d8 + 3) / 2), ceil((d6 + d4) / 3))",
+    result: nestedMaths,
+  },
 ].map((roll) => ({ ...roll, total: roll.result.value }));
 
 export const sampleResult: SvgHistory = {
