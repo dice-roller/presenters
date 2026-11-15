@@ -4,6 +4,11 @@ import { diceArtwork } from "./dice-artwork.js";
 import { SvgPresenter } from "../src/svg/index.js";
 import { sampleResult, sampleRoll } from "./presenter/sample-result.js";
 import { fillValueSlot } from "../src/svg/value-slot.js";
+import {
+  modifierIcons,
+  modifierIconStyles,
+  renderModifierIcon,
+} from "../src/svg/modifier-icons.js";
 const { d2, d4, d6, d8, d10, d12, d20, generic } = diceArtwork;
 
 const stroke = ref("#7962b5");
@@ -66,6 +71,83 @@ const presenter = computed(
 );
 const singlePreview = computed(() => presenter.value.present(sampleRoll));
 const preview = computed(() => presenter.value.present(sampleResult));
+
+const modifierLegend = [
+  {
+    flag: "explode",
+    label: "Explode",
+    detail: "Triggered an additional roll.",
+  },
+  {
+    flag: "compound",
+    label: "Compound",
+    detail: "Explosion results are combined into one value.",
+  },
+  {
+    flag: "penetrate",
+    label: "Penetrate",
+    detail: "Explosion rolls have one subtracted.",
+  },
+  {
+    flag: "re-roll",
+    label: "Re-roll",
+    detail: "The original result was replaced.",
+  },
+  {
+    flag: "re-roll-once",
+    label: "Re-roll once",
+    detail: "A result was replaced by a once-only re-roll.",
+  },
+  {
+    flag: "unique",
+    label: "Unique",
+    detail: "A duplicate was re-rolled for uniqueness.",
+  },
+  {
+    flag: "unique-once",
+    label: "Unique once",
+    detail: "A duplicate was re-rolled once; duplicates may remain.",
+  },
+  { flag: "min", label: "Minimum", detail: "Raised to the specified minimum." },
+  { flag: "max", label: "Maximum", detail: "Capped at the specified maximum." },
+  {
+    flag: "target-success",
+    label: "Success",
+    detail: "Matched a success target.",
+  },
+  {
+    flag: "target-failure",
+    label: "Failure",
+    detail: "Matched a failure target.",
+  },
+  {
+    flag: "critical-success",
+    label: "Critical success",
+    detail: "Matched the critical success condition.",
+  },
+  {
+    flag: "critical-failure",
+    label: "Critical failure",
+    detail: "Matched the critical failure condition.",
+  },
+  {
+    flag: "drop",
+    label: "Dropped",
+    detail: "Faded and crossed out; excluded from the total.",
+  },
+].map((entry, index) => {
+  const kind = modifierIcons([entry.flag])[0];
+  const symbol = kind
+    ? renderModifierIcon(
+        { kind, x: 3, y: 3, width: kind === "compound" ? 39 : 30, height: 30 },
+        `modifier-legend-${index}`,
+      )
+    : `<g opacity=".4" fill="none" stroke="currentColor" stroke-width="2.2"><g transform="translate(3 3) scale(.3)">${fillValueSlot(artwork(d6), "4")}<path d="M14 50h72"/></g></g>`;
+  return {
+    ...entry,
+    symbol: `<svg class="result-preview" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 36" width="45" height="36" aria-hidden="true"><style>${modifierIconStyles}</style>${symbol}</svg>`,
+  };
+});
 </script>
 
 <template>
@@ -155,6 +237,33 @@ const preview = computed(() => presenter.value.present(sampleResult));
       </figure>
     </section>
 
+    <section
+      class="presenter-preview"
+      aria-labelledby="modifier-legend-heading"
+    >
+      <h2 id="modifier-legend-heading">Modifier flags</h2>
+      <ul
+        class="modifier-legend preview-output"
+        :class="{ 'monochrome-modifiers': monochromeModifiers }"
+        :style="{ color: stroke }"
+      >
+        <li v-for="entry in modifierLegend" :key="entry.flag">
+          <span class="modifier-legend-symbol" v-html="entry.symbol" />
+          <div>
+            <strong>{{ entry.label }}</strong>
+            <code>{{ entry.flag }}</code>
+            <p>{{ entry.detail }}</p>
+          </div>
+        </li>
+      </ul>
+      <p>
+        Flags can combine, for example compound and penetrate. Once variants
+        share their family's icon. Keep marks excluded results as dropped;
+        sorting only changes their order. A score label shows a result's
+        contribution to its total.
+      </p>
+    </section>
+
     <section class="presenter-preview" aria-labelledby="single-roll-heading">
       <h2 id="single-roll-heading">Single roll preview</h2>
       <p>
@@ -186,13 +295,6 @@ const preview = computed(() => presenter.value.present(sampleResult));
         that part of the result. Only the most specific region is highlighted.
         Hover a function name or mathematical parenthesis to highlight its
         matching pair.
-      </p>
-      <p class="legend">
-        Faded and crossed out = excluded · burst = explosion · overlapping
-        bursts = compound · piercing arrow = penetrate · circular arrow = reroll
-        · diamond among circles = unique · floor / ceiling arrows = min / max ·
-        tick / cross = target success / failure · star / skull = critical
-        success / failure · score = contribution to the total.
       </p>
       <div
         class="preview-output"
@@ -321,9 +423,34 @@ figcaption {
 .preview-output > svg {
   display: block;
 }
-.legend {
-  color: #d4c8e1;
-  font-size: 0.9rem;
+.modifier-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 20px;
+  padding: 20px;
+  list-style: none;
+}
+.modifier-legend li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.modifier-legend-symbol {
+  flex: 0 0 45px;
+}
+.modifier-legend strong,
+.modifier-legend code {
+  display: block;
+}
+.modifier-legend code {
+  margin-top: 3px;
+  font-size: 0.8rem;
+}
+.modifier-legend p {
+  color: var(--page-text-color);
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
 details {
   margin-top: 20px;
