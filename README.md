@@ -137,3 +137,54 @@ const presenter = new SvgPresenter(artwork, {
 
 Tooltips, `data-*` attributes, exclusion styling and calculated results remain
 available independently of these visibility options.
+
+## Modifier icons
+
+The presenter displays open line symbols for explosions, compound and penetrating
+explosions, rerolls, unique, min/max, target successes/failures, and critical
+successes/failures. Critical success uses a star; critical failure uses a skull.
+Compound explosions show overlapping purple and amber bursts. Combined compound
+and penetrate outcomes show two separate symbols. Dropped results remain faded
+and crossed out. Keep and sort do not need additional icons.
+
+```typescript
+const presenter = new SvgPresenter(artwork, {
+  showModifierIcons: true,
+  modifierIconPosition: "below", // "corner" (default) or "below"
+});
+```
+
+`showModifierIcons` is independent of `showModifierLabels`. Once and limited
+variants share their family's symbol; labels and tooltips retain their details.
+Icons represent actual result flags, rather than every modifier in the notation.
+A uniqueness icon means a duplicate was rerolled, not that uniqueness is guaranteed.
+Group modifier labels are smaller captions centred beneath the whole member and wrap
+within its width. Group member flags are displayed on that member, without repeating them on every
+nested die. Icons wrap into additional rows when needed.
+
+Corner placement cuts transparent circular gaps out of the artwork behind each
+symbol. It does not paint a background colour. Below placement generates no
+artwork cutouts; the compound symbol still masks its rear burst internally.
+Every render generates unique mask identifiers, so multiple outputs can share a
+page safely. Keep the generated definitions with their SVG.
+
+Each icon has `data-modifier` and a matching `modifier-*` class. Values are:
+`explode`, `compound`, `penetrate`, `re-roll`, `unique`, `min`, `max`,
+`target-success`, `target-failure`, `critical-success`, and `critical-failure`.
+Icons remain meaningful in monochrome. Colours can be overridden with CSS:
+
+```css
+.result-preview {
+  --modifier-explode-color: #9b5d0a;
+  --modifier-critical-success-color: #96700b;
+}
+
+/* One colour for all symbols, including compound's rear burst. */
+.result-preview.monochrome {
+  --modifier-icon-color: currentColor;
+}
+```
+
+Every icon family supports `--modifier-{data-modifier}-color`. Compound's rear
+burst follows `--modifier-explode-color`. The demo includes placement, visibility
+and monochrome controls, plus fixed examples of every modifier family.

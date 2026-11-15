@@ -48,7 +48,7 @@ test("SvgPresenter plugs into real v6 rolls and histories without rolling again"
 test("fixed result preview renders dice, maths and modifier outcomes without changing data", () => {
   const before = JSON.stringify(sampleResult);
   const svg = renderSvg(sampleResult, artwork, appearance);
-  assert.equal(sampleResult.total, 254);
+  assert.equal(sampleResult.total, 338);
   for (const total of [149, 13, 16, 15, 2, 21, 10, 28])
     assert.ok(svg.includes(`Total: ${total}`));
   for (const value of [
@@ -86,7 +86,7 @@ test("preview uses the selected appearance, retains totals when values are hidde
   assert.ok(small.includes('width="40" height="40"'));
   assert.ok(large.includes('width="400" height="400"'));
   assert.ok(small.includes("fill:#eee7fb"));
-  assert.ok(small.includes("History total: 254"));
+  assert.ok(small.includes("History total: 338"));
   assert.ok(!/data-slot="value"[^>]*>[^<]+<\/text>/.test(small));
 });
 
@@ -237,7 +237,7 @@ test("single rolls end after their total, without a history divider or spacer", 
   const totalY = Number(
     svg.match(/<text x="[\d.]+" y="([\d.]+)" class="total"/)![1],
   );
-  assert.equal(height - totalY, 24);
+  assert.ok(Math.abs(height - totalY - 24) < 0.001);
   assert.match(presenter.present(sampleResult), /<path[^>]*class="divider"/);
 });
 
@@ -271,6 +271,11 @@ test("nested group and pool descriptions each use the centre of their own scope"
   const headings = [
     ...svg.matchAll(/<tspan x="([\d.]+)" y="([\d.]+)">([^<]+)<\/tspan>/g),
   ];
+  const offsets = [
+    ...svg.matchAll(
+      /class="group-member-result"[^>]*transform="translate\(([\d.]+) ([\d.]+)\)"/g,
+    ),
+  ];
   const pool = headings.find((match) => match[3] === "Weapon damage")!;
   const group = headings.find((match) => match[3] === "Whole group")!;
   assert.ok(
@@ -280,10 +285,15 @@ test("nested group and pool descriptions each use the centre of their own scope"
   assert.ok(
     Math.abs(
       Number(group[1]) -
-        (Number(dice[0]![1]) + Number(dice[1]![1]) + appearance.size) / 2,
+        (Number(dice[0]![1]) +
+          Number(offsets[0]![1]) +
+          Number(dice[1]![1]) +
+          Number(offsets[1]![1]) +
+          appearance.size) /
+          2,
     ) < 0.001,
   );
-  assert.ok(Number(group[2]) < Number(pool[2]));
+  assert.ok(Number(group[2]) < Number(pool[2]) + Number(offsets[0]![2]));
 });
 
 test("group headings span the complete group including inline labels and drop badges", () => {
@@ -438,8 +448,414 @@ test("label, notation and total visibility options work independently for rolls 
           Number(svg.match(/height="([\d.]+)"/)![1]) <
             Number(baseline.match(/height="([\d.]+)"/)![1]),
         );
-      if (combination === 15) assert.equal(svg, baseline);
+      if (combination === 15)
+        assert.equal(
+          svg.replace(/dice-\d+-/g, "dice-render-"),
+          baseline.replace(/dice-\d+-/g, "dice-render-"),
+        );
     }
     assert.equal(JSON.stringify(target), before);
   }
+});
+
+test("modifier icons cover the result families and remain independent of labels", () => {
+  const before = JSON.stringify(sampleResult);
+  const shown = new SvgPresenter(artwork, {
+    ...appearance,
+    showModifierLabels: false,
+  }).present(sampleResult);
+  for (const kind of [
+    "explode",
+    "compound",
+    "penetrate",
+    "re-roll",
+    "unique",
+    "min",
+    "max",
+    "target-success",
+    "target-failure",
+    "critical-success",
+    "critical-failure",
+  ])
+    assert.ok(shown.includes(`data-modifier="${kind}"`), kind);
+  assert.doesNotMatch(shown, /<text[^>]*class="badge"/);
+  const hidden = new SvgPresenter(artwork, {
+    ...appearance,
+    showModifierIcons: false,
+  }).present(sampleResult);
+  assert.ok(!hidden.includes("data-modifier="));
+  assert.ok(!hidden.includes('class="modifier-cutout"'));
+  assert.match(hidden, /<text[^>]*class="badge"/);
+  assert.ok(hidden.includes('data-flags="explode"'));
+  assert.ok(hidden.includes("; explode</title>"));
+  assert.equal(JSON.stringify(sampleResult), before);
+});
+
+test("corner icons straddle the top edge with circular transparent cutouts; below icons have none", () => {
+  for (const size of [40, 80, 140, 200, 400]) {
+    for (const modifierIconPosition of ["corner", "below"] as const) {
+      const svg = new SvgPresenter(artwork, {
+        ...appearance,
+        size,
+        modifierIconPosition,
+      }).present(sampleRoll);
+      const die = svg.match(/<svg x="([\d.]+)" y="([\d.]+)" width="/)!;
+      const badge = svg.match(
+        /data-modifier="explode"[^>]* x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/,
+      )!;
+      const [x, y, width, height] = badge.slice(1).map(Number) as [
+        number,
+        number,
+        number,
+        number,
+      ];
+      assert.ok(y >= 0);
+      if (modifierIconPosition === "corner") {
+        assert.ok(Math.abs(x + width / 2 - Number(die[1]) - size) < 0.001);
+        assert.ok(Math.abs(y + height / 2 - Number(die[2])) < 0.001);
+        assert.match(svg, /class="modifier-cutout"/);
+        const circle = svg.match(
+          /<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)" fill="black"/,
+        )!;
+        assert.ok(Math.abs(Number(circle[1]) - 100) < 0.001);
+        assert.equal(Number(circle[2]), 0);
+        assert.ok(Number(circle[3]) > ((width / 2) * 100) / size);
+        assert.match(svg, /class="die-artwork" mask="url\(#dice-/);
+      } else {
+        assert.ok(y > Number(die[2]) + size);
+        assert.doesNotMatch(svg, /class="modifier-cutout"/);
+        assert.doesNotMatch(svg, /class="die-artwork" mask=/);
+      }
+    }
+  }
+});
+
+test("compound/penetrate uses separate open symbols with a masked amber rear burst", () => {
+  const svg = new SvgPresenter(artwork, {
+    ...appearance,
+    modifierIconPosition: "below",
+  }).present(sampleResult.rolls[10]!);
+  assert.equal((svg.match(/data-modifier="compound"/g) ?? []).length, 1);
+  assert.equal((svg.match(/data-modifier="penetrate"/g) ?? []).length, 1);
+  assert.ok(!svg.includes('data-modifier="explode"'));
+  assert.match(svg, /class="modifier-overlap-mask"/);
+  assert.doesNotMatch(svg, /class="modifier-cutout"/);
+  assert.match(svg, /class="modifier-compound-back"/);
+  assert.match(svg, /aria-label="Compounding explosion"/);
+  assert.match(svg, /aria-label="Penetrating explosion"/);
+  assert.ok(!svg.includes('fill="#f3e8ff"'));
+});
+
+test("once variants share family icons and do not claim that uniqueness is guaranteed", () => {
+  for (const [index, icon, flag] of [
+    [12, "unique", "unique-once"],
+    [13, "re-roll", "re-roll-once"],
+  ] as const) {
+    const svg = new SvgPresenter(artwork, appearance).present(
+      sampleResult.rolls[index]!,
+    );
+    assert.equal(
+      (svg.match(new RegExp(`data-modifier="${icon}"`, "g")) ?? []).length,
+      1,
+    );
+    assert.ok(svg.includes(`data-flags="${flag}"`));
+  }
+  const svg = new SvgPresenter(artwork, appearance).present(
+    sampleResult.rolls[12]!,
+  );
+  assert.match(svg, /aria-label="Re-rolled for uniqueness"/);
+});
+
+test("group member icons attach to their member rather than every nested die", () => {
+  for (const modifierIconPosition of ["corner", "below"] as const) {
+    const svg = new SvgPresenter(artwork, {
+      ...appearance,
+      modifierIconPosition,
+    }).present(sampleResult.rolls[15]!);
+    assert.equal((svg.match(/data-group-member="true"/g) ?? []).length, 2);
+    for (const kind of [
+      "target-success",
+      "target-failure",
+      "critical-success",
+      "critical-failure",
+    ])
+      assert.equal(
+        (svg.match(new RegExp(`data-modifier="${kind}"`, "g")) ?? []).length,
+        1,
+      );
+    assert.equal((svg.match(/data-die-type=/g) ?? []).length, 2);
+    assert.ok(svg.includes('data-flags=""'));
+    assert.ok(svg.includes("Total: 0"));
+  }
+});
+
+test("group outcome icons end at the dice corner and flow left regardless of labels", () => {
+  for (const size of [40, 140, 400]) {
+    for (const showModifierLabels of [true, false]) {
+      const svg = new SvgPresenter(artwork, {
+        ...appearance,
+        size,
+        showModifierLabels,
+        modifierIconPosition: "corner",
+      }).present(sampleResult.rolls[15]!);
+      const members = svg.split('class="group-member-result"').slice(1);
+      assert.equal(members.length, 2);
+      for (const member of members) {
+        const die = member.match(/<svg x="([\d.]+)" y="[\d.]+" width="/)!;
+        const icons = [
+          ...member.matchAll(
+            /data-modifier="[^"]+"[^>]* x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)"/g,
+          ),
+        ];
+        assert.equal(icons.length, 2);
+        const last = icons.at(-1)!;
+        const right = Number(die[1]) + size;
+        assert.ok(
+          Math.abs(Number(last[1]) + Number(last[3]) / 2 - right) < 0.001,
+        );
+        assert.ok(
+          Number(icons[0]![1]) + Number(icons[0]![3]) <= Number(last[1]),
+        );
+        const circles = [
+          ...member.matchAll(
+            /<circle cx="(-?[\d.]+)" cy="(-?[\d.]+)" r="[\d.]+" fill="black"/g,
+          ),
+        ];
+        assert.ok(Math.abs(Number(circles.at(-1)![1]) - right) < 0.001);
+      }
+    }
+  }
+});
+
+test("group modifier labels are smaller centred captions without horizontal label space", () => {
+  for (const size of [40, 140]) {
+    for (const modifierIconPosition of ["corner", "below"] as const) {
+      const presenter = (showModifierLabels: boolean) =>
+        new SvgPresenter(artwork, {
+          ...appearance,
+          size,
+          modifierIconPosition,
+          showModifierLabels,
+        }).present(sampleResult.rolls[15]!);
+      const shown = presenter(true);
+      const hidden = presenter(false);
+      const mathPositions = (svg: string) =>
+        [...svg.matchAll(/<text x="([\d.]+)"[^>]*class="math"/g)].map(
+          (match) => match[1],
+        );
+      assert.deepEqual(mathPositions(shown), mathPositions(hidden));
+      assert.doesNotMatch(hidden, /class="group-member-label/);
+      for (const member of shown
+        .split('class="group-member-result"')
+        .slice(1)) {
+        const maths = [
+          ...member.matchAll(
+            /<text x="([\d.]+)"[^>]*class="math"[^>]*font-size="([\d.]+)"/g,
+          ),
+        ];
+        const expectedCentre =
+          (Number(maths[0]![1]) + Number(maths[1]![1])) / 2;
+        const captions = [
+          ...member.matchAll(
+            /<text x="([\d.]+)" y="([\d.]+)" class="group-member-label[^>]*font-size="([\d.]+)"/g,
+          ),
+        ];
+        assert.ok(captions.length > 0);
+        const die = member.match(/<svg x="[\d.]+" y="([\d.]+)" width="/)!;
+        for (const caption of captions) {
+          assert.ok(Math.abs(Number(caption[1]) - expectedCentre) < 0.001);
+          assert.ok(Number(caption[2]) > Number(die[1]) + size);
+          assert.ok(Number(caption[3]) < Number(maths[0]![2]));
+        }
+        if (size === 40) assert.ok(captions.length > 1);
+      }
+    }
+  }
+});
+
+test("keep and drop group examples exclude complete multi-dice members", () => {
+  for (const [index, notation] of [
+    [16, "{2d6, 2d8}kh1"],
+    [17, "{2d6, 2d8}dl1"],
+  ] as const) {
+    const roll = sampleResult.rolls[index]!;
+    assert.equal(roll.notation, notation);
+    assert.equal(roll.total, 11);
+    const svg = new SvgPresenter(artwork, appearance).present(roll);
+    assert.equal((svg.match(/data-group-member="true"/g) ?? []).length, 2);
+    assert.equal(
+      (svg.match(/data-excluded="true" data-flags=""/g) ?? []).length,
+      2,
+    );
+    assert.equal(
+      (svg.match(/class="group-member-label badge excluded"/g) ?? []).length,
+      1,
+    );
+    assert.doesNotMatch(svg, />\(drop\)<\/text>/);
+    assert.ok(svg.includes("Total: 11"));
+  }
+});
+
+test("group member blank spaces have a transparent hit area behind dice and icons", () => {
+  for (const modifierIconPosition of ["corner", "below"] as const) {
+    for (const size of [40, 140]) {
+      const svg = new SvgPresenter(artwork, {
+        ...appearance,
+        size,
+        modifierIconPosition,
+      }).present(sampleResult.rolls[15]!);
+      for (const member of svg.split('class="group-member-result"').slice(1)) {
+        const hit = member.match(
+          /<rect class="group-member-hit-area" x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="transparent" stroke="none" pointer-events="all"\/>/,
+        )!;
+        assert.ok(hit);
+        assert.ok(
+          member.indexOf("<title>Group member:") < member.indexOf(hit[0]),
+        );
+        assert.ok(
+          member.indexOf(hit[0]) <
+            member.indexOf('class="group-member-artwork"'),
+        );
+        assert.ok(member.includes("<title>d6:"));
+        assert.ok(member.includes('aria-label="Critical'));
+        const right = Number(hit[1]) + Number(hit[3]);
+        const bottom = Number(hit[2]) + Number(hit[4]);
+        for (const icon of member.matchAll(
+          /data-modifier="[^"]+"[^>]* x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" height="([\d.]+)"/g,
+        )) {
+          assert.ok(Number(icon[1]) >= Number(hit[1]));
+          assert.ok(Number(icon[2]) >= Number(hit[2]));
+          assert.ok(Number(icon[1]) + Number(icon[3]) <= right);
+          assert.ok(Number(icon[2]) + Number(icon[4]) <= bottom);
+        }
+        for (const caption of member.matchAll(
+          /<text x="[\d.]+" y="([\d.]+)" class="group-member-label/g,
+        ))
+          assert.ok(Number(caption[1]) <= bottom);
+      }
+    }
+  }
+});
+
+test("every group member has its own title and hit area regardless of modifier visibility", () => {
+  for (const modifierIconPosition of ["corner", "below"] as const) {
+    for (const showModifierLabels of [true, false]) {
+      for (const showModifierIcons of [true, false]) {
+        const presenter = new SvgPresenter(artwork, {
+          ...appearance,
+          modifierIconPosition,
+          showModifierLabels,
+          showModifierIcons,
+        });
+        for (const [target, expected] of [
+          [sampleResult.rolls[6]!, 2],
+          [new Roll("{d6, 2 + 3}").result, 2],
+          [new Roll("{{d6, d8}, 2d10}").result, 4],
+        ] as const) {
+          const svg = presenter.present(target);
+          const members = svg.split('class="group-member-result"').slice(1);
+          assert.equal(members.length, expected);
+          for (const member of members) {
+            assert.match(member, /^[^>]*><title>Group member:/);
+            assert.match(member, /<rect class="group-member-hit-area"/);
+          }
+        }
+      }
+    }
+  }
+});
+
+test("mask identifiers are unique across outputs and all references resolve", () => {
+  const presenter = new SvgPresenter(artwork, appearance);
+  const svg = presenter.present(sampleResult) + presenter.present(sampleResult);
+  const identifiers = [...svg.matchAll(/\bid="([^"]+)"/g)].map(
+    (match) => match[1]!,
+  );
+  assert.equal(new Set(identifiers).size, identifiers.length);
+  for (const reference of svg.matchAll(/url\(#([^)]+)\)/g))
+    assert.ok(identifiers.includes(reference[1]!));
+});
+
+test("many modifiers wrap safely on small dice and location changes preserve all results", () => {
+  const base = sampleResult.rolls[8]!;
+  assert.equal(base.result.type, "pool");
+  if (base.result.type !== "pool") return;
+  const roll = {
+    ...base,
+    result: {
+      ...base.result,
+      rolls: [
+        {
+          ...base.result.rolls[0]!,
+          flags: [
+            "explode",
+            "compound",
+            "penetrate",
+            "re-roll",
+            "unique",
+            "min",
+            "max",
+            "target-success",
+            "critical-success",
+          ] as const,
+        },
+      ],
+    },
+  };
+  const before = JSON.stringify(roll);
+  for (const size of [20, 40, 140, 400]) {
+    for (const modifierIconPosition of ["corner", "below"] as const) {
+      const svg = new SvgPresenter(artwork, {
+        ...appearance,
+        size,
+        modifierIconPosition,
+      }).present(roll);
+      const die = svg.match(/<svg x="([\d.]+)" y="([\d.]+)" width="/)!;
+      const badges = [
+        ...svg.matchAll(
+          /data-modifier="[^"]+"[^>]* x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g,
+        ),
+      ];
+      assert.equal(badges.length, 8);
+      for (const badge of badges) {
+        const [x, y, width, height] = badge.slice(1).map(Number) as [
+          number,
+          number,
+          number,
+          number,
+        ];
+        assert.ok(x >= 0 && x + width <= 1040);
+        assert.ok(y >= 0);
+        assert.ok(
+          modifierIconPosition === "corner"
+            ? y + height / 2 <= Number(die[2]) + 0.001
+            : y >= Number(die[2]) + size,
+        );
+      }
+      if (size <= 40)
+        assert.ok(new Set(badges.map((match) => match[2])).size > 1);
+      assert.ok(svg.includes(`Total: ${roll.total}`));
+    }
+  }
+  assert.equal(JSON.stringify(roll), before);
+});
+
+test("hiding icons removes layout and masks regardless of position; invalid positions are rejected", () => {
+  const presenter = (modifierIconPosition: "corner" | "below") =>
+    new SvgPresenter(artwork, {
+      ...appearance,
+      modifierIconPosition,
+      showModifierIcons: false,
+    });
+  assert.equal(
+    presenter("corner").present(sampleRoll),
+    presenter("below").present(sampleRoll),
+  );
+  assert.throws(
+    () =>
+      new SvgPresenter(artwork, {
+        modifierIconPosition: "invalid" as "corner",
+      }).present(sampleRoll),
+    /Invalid modifier icon position/,
+  );
 });

@@ -13,6 +13,9 @@ const showValues = ref(true);
 const showDescriptions = ref(true);
 const showDiceLabels = ref(true);
 const showModifierLabels = ref(true);
+const showModifierIcons = ref(true);
+const modifierIconPosition = ref<"corner" | "below">("corner");
+const monochromeModifiers = ref(false);
 const showNotation = ref(true);
 const showTotals = ref(true);
 const sizes = {
@@ -55,6 +58,8 @@ const presenter = computed(
       showDescriptions: showDescriptions.value,
       showDiceLabels: showDiceLabels.value,
       showModifierLabels: showModifierLabels.value,
+      showModifierIcons: showModifierIcons.value,
+      modifierIconPosition: modifierIconPosition.value,
       showNotation: showNotation.value,
       showTotals: showTotals.value,
     }),
@@ -100,6 +105,21 @@ const preview = computed(() => presenter.value.present(sampleResult));
         labels</label
       >
       <label
+        ><input v-model="showModifierIcons" type="checkbox" /> Show modifier
+        icons</label
+      >
+      <label
+        >Modifier position
+        <select v-model="modifierIconPosition">
+          <option value="corner">On the corner</option>
+          <option value="below">Below the dice</option>
+        </select></label
+      >
+      <label
+        ><input v-model="monochromeModifiers" type="checkbox" /> Monochrome
+        modifiers</label
+      >
+      <label
         ><input v-model="showNotation" type="checkbox" /> Show notation</label
       >
       <label><input v-model="showTotals" type="checkbox" /> Show totals</label>
@@ -143,6 +163,7 @@ const preview = computed(() => presenter.value.present(sampleResult));
       </p>
       <div
         class="preview-output"
+        :class="{ 'monochrome-modifiers': monochromeModifiers }"
         tabindex="0"
         aria-label="Scrollable single roll SVG result"
         v-html="singlePreview"
@@ -161,11 +182,15 @@ const preview = computed(() => presenter.value.present(sampleResult));
         criticals. Appearance changes reuse these results.
       </p>
       <p class="legend">
-        Crossed out = excluded · ! = explosion · r = reroll · CS / CF = critical
+        Faded and crossed out = excluded · burst = explosion · overlapping
+        bursts = compound · piercing arrow = penetrate · circular arrow = reroll
+        · diamond among circles = unique · floor / ceiling arrows = min / max ·
+        tick / cross = target success / failure · star / skull = critical
         success / failure · score = contribution to the total.
       </p>
       <div
         class="preview-output"
+        :class="{ 'monochrome-modifiers': monochromeModifiers }"
         tabindex="0"
         aria-label="Scrollable SVG results"
         v-html="preview"
@@ -306,5 +331,26 @@ pre {
   padding: 16px;
   background: #211d2a;
   border-radius: 10px;
+}
+</style>
+
+<style>
+.preview-output.monochrome-modifiers {
+  --modifier-icon-color: currentColor;
+}
+@media (prefers-color-scheme: dark) {
+  .preview-output {
+    --modifier-explode-color: var(--modifier-icon-color, #e8b678);
+    --modifier-compound-color: var(--modifier-icon-color, #bc9aea);
+    --modifier-penetrate-color: var(--modifier-icon-color, #7ac4df);
+    --modifier-re-roll-color: var(--modifier-icon-color, #77cbb0);
+    --modifier-unique-color: var(--modifier-icon-color, #e89bc6);
+    --modifier-min-color: var(--modifier-icon-color, #92bbed);
+    --modifier-max-color: var(--modifier-icon-color, #e5c174);
+    --modifier-target-success-color: var(--modifier-icon-color, #85d0a1);
+    --modifier-target-failure-color: var(--modifier-icon-color, #ed9da7);
+    --modifier-critical-success-color: var(--modifier-icon-color, #e8c573);
+    --modifier-critical-failure-color: var(--modifier-icon-color, #ed9cbd);
+  }
 }
 </style>

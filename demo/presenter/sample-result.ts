@@ -280,6 +280,124 @@ const custom = binary(
   pool("{10,20}", 2, [die(20)], [], [10, 20]),
 );
 
+const compound = pool(
+  "6",
+  6,
+  [die(10, ["explode", "compound"], true, 10, 6)],
+  [{ type: "modifier", name: "explode", compound: true, penetrate: false }],
+);
+const penetratingPool = pool(
+  "6",
+  6,
+  [die(6, ["explode", "penetrate"]), die(3, [], true, 3, 4)],
+  [{ type: "modifier", name: "explode", compound: false, penetrate: true }],
+);
+const penetrating = {
+  ...penetratingPool,
+  qty: number(1),
+  node: { ...penetratingPool.node, qty: number(1).node },
+};
+const compoundPenetrating = pool(
+  "6",
+  6,
+  [die(9, ["explode", "compound", "penetrate"], true, 9, 6)],
+  [{ type: "modifier", name: "explode", compound: true, penetrate: true }],
+);
+
+const unique = pool(
+  "6",
+  6,
+  [die(3), die(5, ["unique"], true, 5, 3)],
+  [{ type: "modifier", name: "unique", once: false }],
+);
+const uniqueOnce = pool(
+  "6",
+  6,
+  [die(3), die(3, ["unique-once"], true, 3, 3)],
+  [{ type: "modifier", name: "unique", once: true }],
+);
+const rerollOnce = pool(
+  "6",
+  6,
+  [die(4, ["re-roll-once"], true, 4, 1), die(2)],
+  [{ type: "modifier", name: "re-roll", once: true }],
+);
+const bounds = binary(
+  "+",
+  pool(
+    "6",
+    6,
+    [die(3, ["min"], true, 3, 1), die(5)],
+    [{ type: "modifier", name: "min", value: 3 }],
+  ),
+  pool(
+    "6",
+    6,
+    [die(4, ["max"], true, 4, 6), die(2)],
+    [{ type: "modifier", name: "max", value: 4 }],
+  ),
+);
+const scoredMembers: results.GroupMemberResult[] = [
+  {
+    ...member(pool("6", 6, [die(6)])),
+    calculationValue: 1,
+    flags: ["target-success", "critical-success"],
+  },
+  {
+    ...member(pool("6", 6, [die(1)])),
+    calculationValue: -1,
+    flags: ["target-failure", "critical-failure"],
+  },
+];
+const scoredGroup: ExpressionResult = {
+  type: "group",
+  value: 0,
+  members: scoredMembers,
+  node: {
+    type: "group",
+    expressions: scoredMembers.map((item) => item.result.node),
+    modifiers: [
+      {
+        type: "modifier",
+        name: "target",
+        rules: [
+          { kind: "success", comparePoint: { operator: ">=", value: 5 } },
+          { kind: "failure", comparePoint: { operator: "<=", value: 2 } },
+        ],
+      },
+      {
+        type: "modifier",
+        name: "critical-success",
+        comparePoint: { operator: "=", value: 6 },
+      },
+      {
+        type: "modifier",
+        name: "critical-failure",
+        comparePoint: { operator: "=", value: 1 },
+      },
+    ],
+  },
+};
+
+function selectionGroup(name: "keep" | "drop"): ExpressionResult {
+  const members = [
+    member(pool("6", 6, [die(3), die(4)]), ["drop"], false),
+    member(pool("8", 8, [die(5), die(6)])),
+  ];
+  return {
+    type: "group",
+    value: 11,
+    members,
+    node: {
+      type: "group",
+      expressions: members.map((item) => item.result.node),
+      modifiers: [
+        { type: "modifier", name, end: name === "keep" ? "h" : "l", qty: 1 },
+      ],
+    },
+  };
+}
+
 /** Fixed v6-shaped results. No RNG, parser or roll evaluator runs in the demo. */
 const rolls = [
   {
@@ -304,6 +422,16 @@ const rolls = [
     result: group,
   },
   { notation: "d{0:5} + d{1,1,2,3,5,8} + d{10,20}", result: custom },
+  { notation: "d6!!", result: compound },
+  { notation: "d6!p", result: penetrating },
+  { notation: "d6!!p", result: compoundPenetrating },
+  { notation: "2d6u", result: unique },
+  { notation: "2d6uo", result: uniqueOnce },
+  { notation: "2d6ro=1", result: rerollOnce },
+  { notation: "2d6min3 + 2d6max4", result: bounds },
+  { notation: "{d6, d6}>=5f<=2cs=6cf=1", result: scoredGroup },
+  { notation: "{2d6, 2d8}kh1", result: selectionGroup("keep") },
+  { notation: "{2d6, 2d8}dl1", result: selectionGroup("drop") },
 ].map((roll) => ({ ...roll, total: roll.result.value }));
 
 export const sampleResult: SvgHistory = {

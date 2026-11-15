@@ -1,3 +1,13 @@
+import {
+  modifierIcons,
+  modifierIconStyles,
+  layoutModifierIcons,
+  renderModifierCutout,
+  renderModifierIcon,
+} from "./modifier-icons.js";
+import type { ModifierIconPosition } from "./modifier-icons.js";
+
+let presentationSequence = 0;
 import { fillValueSlot } from "./value-slot.js";
 import type {
   ExpressionResult,
@@ -24,11 +34,14 @@ export interface Appearance {
   readonly showDescriptions?: boolean;
   readonly showDiceLabels?: boolean;
   readonly showModifierLabels?: boolean;
+  readonly showModifierIcons?: boolean;
+  readonly modifierIconPosition?: ModifierIconPosition;
   readonly showNotation?: boolean;
   readonly showTotals?: boolean;
 }
 
 type Token =
+  | { kind: "member"; children: Token[]; item: ScoredItem; excluded: boolean }
   | { kind: "description"; value: string; excluded: boolean }
   | {
       kind: "block";
@@ -165,18 +178,15 @@ function expressionTokens(
         text("{"),
         ...result.members.flatMap((member, index) => {
           const dropped = excluded || !member.useInTotal;
+          const children = visit(member.result, dropped);
           return [
             ...(index ? [text(",")] : []),
-            ...visit(member.result, dropped),
-            ...(showModifierLabels && markers(member)
-              ? [
-                  {
-                    kind: "text" as const,
-                    value: `(${markers(member)})`,
-                    excluded: dropped,
-                  },
-                ]
-              : []),
+            {
+              kind: "member" as const,
+              children,
+              item: member,
+              excluded: dropped,
+            },
           ];
         }),
         text("}"),
@@ -211,7 +221,16 @@ export function renderSvg(
     if (!/^#[0-9a-f]{6}$/i.test(colour))
       throw new Error("Expected a six-digit hex colour");
   }
+  const position = appearance.modifierIconPosition ?? "corner";
+  if (position !== "corner" && position !== "below")
+    throw new Error("Invalid modifier icon position");
+  const prefix = `dice-${++presentationSequence}`;
+  let identifier = 0;
+  const nextId = () => `${prefix}-${++identifier}`;
   const size = appearance.size;
+  const iconSize = Math.max(16, Math.min(38, size * 0.192));
+  const visibleIcons = (flags: readonly string[]) =>
+    appearance.showModifierIcons === false ? [] : modifierIcons(flags);
   const width = 1040;
   const padding = 24;
   const font = Math.max(14, Math.min(32, size * 0.2));
@@ -220,15 +239,6 @@ export function renderSvg(
   const showModifierLabels = appearance.showModifierLabels !== false;
   const showNotation = appearance.showNotation !== false;
   const showTotals = appearance.showTotals !== false;
-  const lineHeight =
-    size +
-    12 +
-    (showDiceLabels ? caption + 4 : 0) +
-    (showModifierLabels
-      ? showDiceLabels
-        ? caption * 2 + 12
-        : caption + 4
-      : 0);
   let y = padding;
   const output: string[] = [];
   const label = (
@@ -326,6 +336,86 @@ export function renderSvg(
   }
 
   function measure(token: Token, available: number): Box {
+    if (token.kind === "member") {
+      const names = visibleIcons(token.item.flags);
+      const memberLabel = showModifierLabels ? markers(token.item) : "";
+      const reserve =
+        names.length && position === "corner"
+          ? Math.max(6, iconSize * 0.65 + 5)
+          : 0;
+      const child = layout(
+        token.children,
+        Math.max(1, available - reserve * 2),
+      );
+      // Member labels and punctuation can extend well beyond the dice. Anchor
+      // corner flags to the artwork, rather than the complete member box.
+      const iconLeft = position === "corner" ? (child.diceLeft ?? 0) : 0;
+      const iconWidth =
+        position === "corner" && child.diceRight !== undefined
+          ? child.diceRight - iconLeft
+          : child.width;
+      const iconLayout = layoutModifierIcons(
+        names,
+        iconWidth,
+        child.height,
+        iconSize,
+        position,
+      );
+      const icons = {
+        ...iconLayout,
+        padding: names.length ? iconLayout.padding : 0,
+        items: iconLayout.items.map((icon) => ({
+          ...icon,
+          x: icon.x + iconLeft,
+        })),
+      };
+      const labelLines = memberLabel
+        ? wrapDescription(
+            memberLabel,
+            (child.width * descriptionFont) / caption,
+          )
+        : [];
+      const labelTop = child.height + icons.bottom + 4;
+      const memberWidth = child.width + icons.padding * 2;
+      const memberHeight =
+        child.height +
+        icons.top +
+        icons.bottom +
+        (labelLines.length ? 4 + labelLines.length * caption * 1.4 : 0);
+      return {
+        width: memberWidth,
+        height: memberHeight,
+        axis: child.axis + icons.top,
+        ...(child.diceLeft !== undefined
+          ? {
+              diceLeft: child.diceLeft + icons.padding,
+              diceRight: child.diceRight! + icons.padding,
+            }
+          : {}),
+        paint: (x, y) => {
+          const id = nextId();
+          const mask =
+            names.length && position === "corner"
+              ? renderModifierCutout(id, icons.items, child.width, child.height)
+              : "";
+          const details = `Group member: ${token.item.value}; contribution ${token.excluded ? 0 : token.item.calculationValue}; ${token.item.flags.join(", ")}`;
+          const annotation = labelLines
+            .map((line, index) =>
+              label(
+                line,
+                child.width / 2,
+                labelTop + caption + index * caption * 1.4,
+                `class="group-member-label badge${token.excluded ? " excluded" : ""}" text-anchor="middle" font-size="${caption}"`,
+              ),
+            )
+            .join("");
+          // Paint the hit area first, outside the artwork mask, so empty space
+          // inherits this title while later dice/icons keep their own tooltips.
+          const hitArea = `<rect class="group-member-hit-area" x="${-icons.padding}" y="${-icons.top}" width="${memberWidth}" height="${memberHeight}" fill="transparent" stroke="none" pointer-events="all"/>`;
+          return `<g class="group-member-result" data-group-member="true" data-flags="${escape(token.item.flags.join(" "))}" data-excluded="${token.excluded}" transform="translate(${x + icons.padding} ${y + icons.top})"><title>${escape(details)}</title>${hitArea}${mask}<g class="group-member-artwork"${mask ? ` mask="url(#${id})"` : ""}>${child.paint(0, 0)}</g><g class="modifier-flags${token.excluded ? " excluded" : ""}">${icons.items.map((icon) => renderModifierIcon(icon, nextId())).join("")}</g>${annotation}</g>`;
+        },
+      };
+    }
     if (token.kind === "block" || token.kind === "description") {
       const child =
         token.kind === "block" ? layout(token.children, available) : undefined;
@@ -369,15 +459,37 @@ export function renderSvg(
           `<g class="${token.excluded ? "excluded" : "included"}"><text class="description" fill="currentColor" font-size="${descriptionFont}" text-anchor="${child ? "middle" : "start"}">${lines.map((line, index) => `<tspan x="${x + (child ? inset + centre : 6)}" y="${y + descriptionFont + index * descriptionLine}">${escape(line)}</tspan>`).join("")}</text></g>${child?.paint(x + inset, y + headingHeight) ?? ""}`,
       };
     }
+    const icons = layoutModifierIcons(
+      token.kind === "die" ? visibleIcons(token.roll.flags) : [],
+      size,
+      size,
+      iconSize,
+      position,
+    );
     const tokenWidth =
       token.kind === "die"
-        ? size + 12
+        ? size + icons.padding * 2
         : Math.max(16, token.value.length * font * 0.62 + 10);
     return {
       width: tokenWidth,
-      ...(token.kind === "die" ? { diceLeft: 6, diceRight: 6 + size } : {}),
-      height: token.kind === "die" ? lineHeight : font + 4,
-      axis: token.kind === "die" ? size / 2 : font / 2,
+      ...(token.kind === "die"
+        ? { diceLeft: icons.padding, diceRight: icons.padding + size }
+        : {}),
+      height:
+        token.kind === "die"
+          ? size +
+            12 +
+            icons.top +
+            icons.bottom +
+            (showModifierLabels && markers(token.roll)
+              ? showDiceLabels
+                ? caption * 2 + 10
+                : caption + 4
+              : showDiceLabels
+                ? caption + 4
+                : 0)
+          : font + 4,
+      axis: token.kind === "die" ? size / 2 + icons.top : font / 2,
       paint: (x, y) => {
         const content: string[] = [];
         let data = "";
@@ -393,6 +505,7 @@ export function renderSvg(
         } else {
           // Centre the artwork within its padded token, just like text tokens.
           const dieX = x + (tokenWidth - size) / 2;
+          const dieTop = y + icons.top;
           const { pool, roll: die } = token;
           const fudge = /^F(?:\.[12])?$/.test(pool.die.notation);
           const key = fudge
@@ -430,20 +543,33 @@ export function renderSvg(
             .replace(/^<svg\b[^>]*>/, "")
             .replace(/<\/svg>\s*$/, "");
           const details = `d${pool.die.notation}: ${die.value}; contribution ${token.excluded ? 0 : die.calculationValue}${die.flags.length ? `; ${die.flags.join(", ")}` : ""}${die.initialValue !== die.value ? `; initial value ${die.initialValue}` : ""}`;
+          const maskId = nextId();
+          const mask =
+            icons.items.length && position === "corner"
+              ? renderModifierCutout(
+                  maskId,
+                  icons.items,
+                  size,
+                  size,
+                  100 / size,
+                )
+              : "";
+          const struck = token.excluded
+            ? '<path d="M14 50h72" stroke="currentColor" stroke-width="2"/>'
+            : "";
           content.push(
-            `<title>${escape(details)}</title><svg x="${dieX}" y="${y}" width="${size}" height="${size}" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${fillValueSlot(body, appearance.showValues ? value : "")}</svg>`,
+            `<title>${escape(details)}</title><svg x="${dieX}" y="${dieTop}" width="${size}" height="${size}" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${mask}<g class="die-artwork"${mask ? ` mask="url(#${maskId})"` : ""}>${fillValueSlot(body, appearance.showValues ? value : "")}${struck}</g></svg>`,
+            ...icons.items.map((icon) =>
+              renderModifierIcon(icon, nextId(), dieX, dieTop),
+            ),
           );
-          if (token.excluded)
-            content.push(
-              `<path d="M${dieX + size * 0.14} ${y + size * 0.5}h${size * 0.72}" stroke="currentColor" stroke-width="2"/>`,
-            );
           const dieLabel = `d${pool.die.notation}`;
           if (showDiceLabels)
             content.push(
               label(
                 dieLabel.length > 22 ? dieLabel.slice(0, 21) + "…" : dieLabel,
                 dieX + size / 2,
-                y + size + caption + 4,
+                dieTop + size + icons.bottom + caption + 4,
                 `class="caption" text-anchor="middle" font-size="${caption}"`,
               ),
             );
@@ -453,7 +579,10 @@ export function renderSvg(
               label(
                 badges,
                 dieX + size / 2,
-                y + size + (showDiceLabels ? caption * 2 + 10 : caption + 4),
+                dieTop +
+                  size +
+                  icons.bottom +
+                  (showDiceLabels ? caption * 2 + 10 : caption + 4),
                 `class="badge" text-anchor="middle" font-size="${Math.max(8, Math.min(caption, size / (badges.length * 0.65)))}"`,
               ),
             );
@@ -514,7 +643,7 @@ export function renderSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="result-preview" role="img" aria-label="Dice results" style="color:${appearance.stroke};font-family:system-ui,sans-serif">
     <title>Dice results</title>
     <desc>Evaluated results with arithmetic, modifiers and individual dice.</desc>
-    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}.result-preview .math{fill:currentColor}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
+    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}${modifierIconStyles}.result-preview .math{fill:currentColor}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
     ${output.join("")}
 </svg>`;
 }
@@ -538,6 +667,8 @@ export class SvgPresenter implements Presenter<string> {
       showDescriptions: true,
       showDiceLabels: true,
       showModifierLabels: true,
+      showModifierIcons: true,
+      modifierIconPosition: "corner",
       showNotation: true,
       showTotals: true,
       ...appearance,
