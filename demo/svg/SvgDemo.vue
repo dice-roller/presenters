@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import DemoNav from "../DemoNav.vue";
 import { diceArtwork } from "./dice-artwork.js";
-import { SvgPresenter } from "../src/svg/index.js";
-import { sampleResult, sampleRoll } from "./presenter/sample-result.js";
-import { fillValueSlot } from "../src/svg/value-slot.js";
+import { SvgPresenter } from "@dice-roller/svg-presenter";
+import {
+  sampleResult,
+  sampleRoll,
+} from "../../packages/svg/tests/fixtures/sample-result.js";
+import { fillValueSlot } from "../../packages/svg/src/value-slot.js";
 import {
   modifierIcons,
   modifierIconStyles,
   renderModifierIcon,
-} from "../src/svg/modifier-icons.js";
+} from "../../packages/svg/src/modifier-icons.js";
 const { d2, d4, d6, d8, d10, d12, d20, generic } = diceArtwork;
 
 const stroke = ref("#7962b5");
@@ -152,6 +156,7 @@ const modifierLegend = [
 
 <template>
   <main>
+    <DemoNav />
     <p class="eyebrow">Dice Roller / Presenters</p>
     <h1>Dice artwork playground</h1>
     <p>
@@ -310,180 +315,3 @@ const modifierLegend = [
     </section>
   </main>
 </template>
-
-<style>
-:root {
-  --die-size: 140px;
-  --die-fill: none;
-
-  --page-bg: #fff;
-  --page-text-color: #0a0a0a;
-  --card-bg: #f7f7f7;
-
-  font-family: system-ui, sans-serif;
-  color: var(--page-text-color);
-  background: var(--page-bg);
-  color-scheme: dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --page-bg: #17151e;
-    --page-text-color: #ede9f4;
-    --card-bg: #211d2a;
-  }
-}
-
-body {
-  margin: 0;
-}
-main {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 48px 24px;
-}
-.eyebrow {
-  color: #d8b4fe;
-}
-h1 {
-  font-size: clamp(2rem, 5vw, 3rem);
-  margin: 12px 0;
-}
-p {
-  line-height: 1.7;
-  max-width: 70ch;
-}
-.controls {
-  position: sticky;
-  top: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  align-items: center;
-  margin: 28px 0;
-  padding: 20px;
-  border: 1px solid #655970;
-  border-radius: 12px;
-  background-color: var(--page-bg);
-}
-.controls label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-input[type="color"] {
-  width: 42px;
-  height: 32px;
-}
-.gallery {
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(min(100%, calc(var(--die-size) + 40px)), 1fr)
-  );
-  gap: 18px;
-}
-.card {
-  display: grid;
-  justify-items: center;
-  gap: 16px;
-  margin: 0;
-  padding: 24px 16px;
-  color: #3b2c50;
-  background: var(--card-bg);
-  border-radius: 14px;
-}
-
-.die {
-  display: block;
-  width: var(--die-size);
-  height: var(--die-size);
-}
-.die-outline {
-  fill: var(--die-fill, none);
-}
-.die-value {
-  fill: currentColor;
-  stroke: none;
-  font-weight: 600;
-}
-figcaption {
-  font-weight: 600;
-}
-
-.presenter-preview {
-  margin-top: 48px;
-}
-.preview-output {
-  overflow: auto;
-  padding: 12px;
-  background: var(--card-bg);
-  border-radius: 14px;
-}
-.preview-output > svg {
-  display: block;
-}
-.modifier-legend {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-  gap: 20px;
-  padding: 20px;
-  list-style: none;
-}
-.modifier-legend li {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.modifier-legend-symbol {
-  flex: 0 0 45px;
-}
-.modifier-legend strong,
-.modifier-legend code {
-  display: block;
-}
-.modifier-legend code {
-  margin-top: 3px;
-  font-size: 0.8rem;
-}
-.modifier-legend p {
-  color: var(--page-text-color);
-  margin: 6px 0 0;
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-details {
-  margin-top: 20px;
-}
-summary {
-  cursor: pointer;
-}
-pre {
-  overflow: auto;
-  max-height: 420px;
-  padding: 16px;
-  background: #211d2a;
-  border-radius: 10px;
-}
-</style>
-
-<style>
-.preview-output.monochrome-modifiers {
-  --modifier-icon-color: currentColor;
-}
-@media (prefers-color-scheme: dark) {
-  .preview-output {
-    --modifier-explode-color: var(--modifier-icon-color, #e8b678);
-    --modifier-compound-color: var(--modifier-icon-color, #bc9aea);
-    --modifier-penetrate-color: var(--modifier-icon-color, #7ac4df);
-    --modifier-re-roll-color: var(--modifier-icon-color, #77cbb0);
-    --modifier-unique-color: var(--modifier-icon-color, #e89bc6);
-    --modifier-min-color: var(--modifier-icon-color, #92bbed);
-    --modifier-max-color: var(--modifier-icon-color, #e5c174);
-    --modifier-target-success-color: var(--modifier-icon-color, #85d0a1);
-    --modifier-target-failure-color: var(--modifier-icon-color, #ed9da7);
-    --modifier-critical-success-color: var(--modifier-icon-color, #e8c573);
-    --modifier-critical-failure-color: var(--modifier-icon-color, #ed9cbd);
-  }
-}
-</style>

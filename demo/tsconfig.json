@@ -1,11 +1,14 @@
 {
-  "extends": "../tsconfig.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@dice-roller/svg-presenter": ["../packages/svg/src/index.ts"]
+    }
   },
-  "include": ["./**/*.ts", "./**/*.vue", "../src/**/*.ts"]
+  "include": ["./**/*.ts", "./**/*.vue", "../packages/svg/src/**/*.ts"]
 }

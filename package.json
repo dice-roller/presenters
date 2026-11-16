@@ -1,44 +1,32 @@
 {
   "name": "@dice-roller/presenters",
-  "version": "0.0.0",
   "private": true,
   "description": "Official result presenters for RPG Dice Roller.",
   "type": "module",
-  "sideEffects": false,
-  "files": [
-    "dist",
-    "assets/dice"
-  ],
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./icons/*.svg": "./assets/dice/*.svg",
-    "./svg": {
-      "types": "./dist/svg/index.d.ts",
-      "import": "./dist/svg/index.js"
-    }
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/dice-roller/presenters.git"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "vite --config vite.demo.config.ts",
-    "build": "tsc -p tsconfig.build.json",
-    "build:demo": "vite build --config vite.demo.config.ts",
-    "typecheck": "npm run build && tsc --noEmit && vue-tsc --noEmit -p demo/tsconfig.json && tsc -p tests/tsconfig.json",
+    "dev": "npm run build && vite --config vite.demo.config.ts",
+    "build": "npm run build --workspaces",
+    "build:demo": "npm run build && vite build --config vite.demo.config.ts",
+    "preview:demo": "vite preview --config vite.demo.config.ts",
+    "typecheck": "npm run build && npm run typecheck --workspaces && tsc --noEmit -p tsconfig.json && vue-tsc --noEmit -p demo/tsconfig.json",
+    "test": "npm run test --workspaces",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run format:check && npm run build:demo",
-    "test": "npm run build && node --import tsx --test tests/*.test.ts"
+    "pack:check": "npm pack --workspaces --dry-run"
   },
   "devDependencies": {
-    "@dice-roller/rpg-dice-roller": "github:dice-roller/rpg-dice-roller#feature/next/prepare-git-installation",
+    "@dice-roller/rpg-dice-roller": "^6.0.0-beta.5",
     "@types/node": "^22.0.0",
     "@vitejs/plugin-vue": "^6.0.10",
     "prettier": "^3.0.0",
@@ -47,8 +35,5 @@
     "vite": "^8.3.8",
     "vue": "^3.5.45",
     "vue-tsc": "^3.0.0"
-  },
-  "peerDependencies": {
-    "@dice-roller/rpg-dice-roller": ">=6.0.0-0"
   }
 }

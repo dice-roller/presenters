@@ -1,4 +1,5 @@
 import { createApp } from "vue";
-import App from "./App.vue";
+import Home from "./Home.vue";
+import "./styles.css";
 
-createApp(App).mount("#app");
+createApp(Home).mount("#app");

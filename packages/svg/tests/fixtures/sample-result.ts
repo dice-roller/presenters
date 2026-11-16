@@ -3,7 +3,7 @@ import type {
   ast,
   results,
 } from "@dice-roller/rpg-dice-roller";
-import type { SvgHistory, SvgRoll } from "../../src/svg/index.js";
+import type { SvgHistory, SvgRoll } from "../../src/index.js";
 type PoolResult = results.PoolResult;
 type ScoredItem = results.ScoredItem;
 

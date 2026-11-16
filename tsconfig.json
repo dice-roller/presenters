@@ -1,13 +1,7 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true,
-    "noUncheckedIndexedAccess": true,
-    "types": ["node"]
+    "noEmit": true
   },
-  "include": ["src/**/*.ts", "vite.demo.config.ts"]
+  "include": ["vite.demo.config.ts"]
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { fillValueSlot } from "../dist/svg/value-slot.js";
+import { fillValueSlot } from "../dist/value-slot.js";
 
 const icon = (name: string): string =>
   readFileSync(new URL(`../assets/dice/${name}.svg`, import.meta.url), "utf8");

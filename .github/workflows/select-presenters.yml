@@ -1,0 +1,79 @@
+name: Select presenter packages
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        required: true
+        type: string
+      workspace:
+        description: Directory name under packages; empty selects eligible packages
+        type: string
+        default: ""
+    outputs:
+      matrix:
+        value: ${{ jobs.select.outputs.matrix }}
+      has-packages:
+        value: ${{ jobs.select.outputs.has-packages }}
+
+permissions:
+  contents: read
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.packages.outputs.matrix }}
+      has-packages: ${{ steps.packages.outputs.has-packages }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/github-script@v8
+        id: packages
+        env:
+          MODE: ${{ inputs.mode }}
+          WORKSPACE: ${{ inputs.workspace }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { execFileSync } = require('node:child_process');
+            const { MODE, WORKSPACE } = process.env;
+            if (!['prepare', 'tag', 'stage'].includes(MODE)) throw new Error('Invalid selection mode');
+            if (WORKSPACE && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(WORKSPACE)) {
+              throw new Error('Use a presenter directory name, such as svg');
+            }
+            if (MODE === 'prepare' && !WORKSPACE) throw new Error('Select a presenter to release');
+            const before = context.payload.before;
+            let changed;
+            if (MODE === 'stage' && context.eventName === 'push' && before && !/^0+$/.test(before)) {
+              changed = new Set(execFileSync('git', ['diff', '--name-only', before, context.sha, '--', 'packages/*/package.json'], { encoding: 'utf8' }).trim().split('\n'));
+            }
+            const include = [];
+            let found = false;
+            for (const entry of fs.readdirSync('packages', { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+              if (!entry.isDirectory() || (WORKSPACE && entry.name !== WORKSPACE)) continue;
+              const directory = `packages/${entry.name}`;
+              const manifest = `${directory}/package.json`;
+              if (!fs.existsSync(manifest)) continue;
+              const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+              if (pkg.private === true) continue;
+              if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.name)) throw new Error(`Invalid presenter directory: ${entry.name}`);
+              found = true;
+              const prefix = `${entry.name}-v`;
+              if (MODE === 'tag') {
+                const pr = context.payload.pull_request;
+                const expected = `release/prepare/${pr.base.ref.replaceAll('/', '-')}/${prefix}${pkg.version}`;
+                if (pr.head.ref !== expected) continue;
+              }
+              if (MODE === 'stage') {
+                if (pkg.version === '0.0.0') continue;
+                if (changed && !changed.has(manifest)) continue;
+              }
+              include.push({ directory, prefix });
+            }
+            if (WORKSPACE && !found) throw new Error(`Unknown publishable presenter: ${WORKSPACE}`);
+            core.setOutput('matrix', JSON.stringify({ include }));
+            core.setOutput('has-packages', include.length > 0);
+            core.info(`Selected presenters: ${include.map(item => item.directory).join(', ') || 'none'}`);

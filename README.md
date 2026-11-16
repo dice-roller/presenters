@@ -1,269 +1,111 @@
 # Dice Roller Presenters
 
-Official result presenters for [RPG Dice Roller](https://github.com/dice-roller/rpg-dice-roller).
+Optional TypeScript presenters for [RPG Dice Roller](https://github.com/dice-roller/rpg-dice-roller).
 
-A shared TypeScript package of optional presenters. The initial SVG presenter
-generates dice tray images from evaluated results. The package is not yet published.
+One repository, independently published npm packages. The repository root is private
+and is never published. Only the SVG presenter exists so far; it is not yet released.
 
-## Development
+| Workspace      | npm package                  | Local demo |
+| -------------- | ---------------------------- | ---------- |
+| `packages/svg` | `@dice-roller/svg-presenter` | `/svg/`    |
 
-Use Node.js 22.12 or newer.
+See the [SVG presenter guide](packages/svg/README.md) for usage, appearance,
+modifier flags, metadata and hover behaviour.
+
+## Local development
+
+Use Node.js 22.12 or newer; `.nvmrc` selects the latest LTS.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. The Vue demo shows the original dice icons
-with example values, including percentile and Fudge dice. Its appearance controls
-let you change the colours and toggle fills or values without changing the assets.
-Below the icon gallery, an initial SVG output preview renders a fixed v6-shaped
-result history with mixed dice, maths and modifiers. It shares the appearance
-controls and exposes its input object for inspection.
+Open the URL Vite prints. `/` lists the presenters; `/svg/` contains the artwork
+gallery and all existing result examples. Each presenter has its own demo page.
+The demo is for local development and has no deployment workflow.
 
 ```sh
-npm run typecheck
-npm test
-npm run build
-npm run check
+npm test              # each workspace's tests
+npm run check         # TypeScript, formatting and the demo build
+npm run build         # each workspace's JavaScript and declarations
+npm run pack:check    # inspect each package's publishable files
+npm run preview:demo  # serve the built local demo
 ```
 
-`build` emits the library's JavaScript and TypeScript declarations into `dist/`.
-`build:demo` creates a separate local demo build in `demo-dist/`.
-Vue and Vite are development dependencies; neither is included in the library.
+Workspace commands can run independently:
 
-## Branches
-
-- `main`: stable branch.
-- `develop`: integration branch.
-- `feature/svg-presenter`: SVG presenter development and local playground.
-
-## SVG presenter
-
-```typescript
-import { Roll } from "@dice-roller/rpg-dice-roller";
-import { SvgPresenter } from "@dice-roller/presenters/svg";
-
-// Supply SVG template strings, keyed by shape (d2, d4, d6, etc.).
-// Include a generic template for unsupported face counts.
-const presenter = new SvgPresenter(artwork, { size: 140 });
-const svg = new Roll("2d6 + 3").present(presenter);
+```sh
+npm run build --workspace=@dice-roller/svg-presenter
+npm test --workspace=@dice-roller/svg-presenter
 ```
 
-The presenter supports rolls, histories and expression results. It uses the core
-library's types and reads existing results without evaluating or rolling again.
-The SVG renderer and text-slot helper live in `src/svg/`; the fixed sample result
-and artwork gallery remain in `demo/`.
+## Repository layout
 
-The dice roller is a peer dependency requiring v6 (including prereleases), and a
-development dependency using the current rewrite from GitHub. The npm `next` tag
-currently points to an older alpha with a different API.
+| Location                      | Purpose                               |
+| ----------------------------- | ------------------------------------- |
+| `packages/<presenter>/src`    | TypeScript library source             |
+| `packages/<presenter>/tests`  | Package tests and fixtures            |
+| `packages/<presenter>/dist`   | Generated JavaScript and declarations |
+| `demo/<presenter>/index.html` | Presenter demo entry point            |
+| `demo/presenters.ts`          | Presenter navigation and index        |
+| `tsconfig.base.json`          | Shared strict TypeScript settings     |
 
-The development dependency temporarily uses `feature/next/prepare-git-installation`,
-a branch of `next` adding the package preparation hook needed for Git installs.
-Switch it to `next` once that packaging fix is merged.
+The SVG package owns its dice assets, dependencies, exports and version.
+Tests and demos consume its workspace API; Vite resolves that API to TypeScript
+source during local development so edits update immediately. Vue and Vite are
+repository development dependencies, not presenter runtime dependencies.
 
-Pool and group descriptions are displayed once alongside their results. Inline
-descriptions follow the pool or group; block descriptions sit above it and wrap
-as needed. Set `showDescriptions: false` to hide them. The local demo includes
-nested examples and a matching appearance control.
+The core dice roller is a v6 peer dependency and a published-beta development
+dependency. The lockfile no longer relies on a temporary Git branch.
 
-## Selecting dice
+## Adding a presenter
 
-Each rendered die has `data-*` attributes on its enclosing `<g>`, covering its
-SVG, caption and modifier markers. The die type is the core factory name
-(`standard`, `percentile`, `fudge`, `range`, `face`, or a registered custom name).
-The shape describes the artwork actually used, independently of the die type.
-Face counts come directly from the core snapshot: for example, default `dF`
-currently has three equally likely faces and uses the d6 artwork.
+1. Create `packages/<presenter>/package.json` with its own package name, version,
+   exports, runtime/peer dependencies and `build`, `typecheck`, `test` and
+   `prepack` scripts. Keep `0.0.0` until preparing its first release.
+2. Extend `../../tsconfig.base.json` from the package's TypeScript config. Build
+   only its `src` into its own `dist`, including declaration files. The SVG
+   package provides an example.
+3. Add `demo/<presenter>/index.html`, its TypeScript entry point and Vue page.
+   Vite discovers presenter HTML entry points automatically. Register the page
+   in `demo/presenters.ts`, and add its source alias to `vite.demo.config.ts`
+   and the corresponding TypeScript path in `demo/tsconfig.json`.
+4. Run `npm install` at the root to link the workspace and update the lockfile.
+   Run tests, checks and `npm run pack:check` before committing.
 
-| Attribute                          | Value                                                           |
-| ---------------------------------- | --------------------------------------------------------------- |
-| `data-die-type`                    | Core die factory name                                           |
-| `data-faces`                       | Face count, including repeated faces                            |
-| `data-notation`                    | Die notation, such as `d20`, `d%`, or `dF`                      |
-| `data-shape`                       | Artwork key, such as `d20`, `d6`, or `generic`                  |
-| `data-min`, `data-max`             | Lowest and highest possible values                              |
-| `data-value`, `data-initial-value` | Final and original rolled values                                |
-| `data-calculation-value`           | Value used for scoring before exclusion                         |
-| `data-use-in-total`                | The die's own inclusion state (`true` / `false`)                |
-| `data-excluded`                    | Effective exclusion, including a dropped enclosing group member |
-| `data-flags`                       | Space-separated modifier flags; empty if there are none         |
+Each publishable package should have a README and declare only the dependencies
+needed by its own presenter. Do not add `private: true` to a publishable package.
 
-```css
-[data-die-type="standard"][data-faces="20"] .die-outline {
-  stroke: rebeccapurple;
-}
+## Releases
 
-[data-flags~="explode"] .die-value {
-  font-weight: 800;
-}
+The release jobs discover publishable presenters under `packages/*` and call the
+organisation's shared workflows. Each package uses its directory name as its tag
+prefix: `packages/svg` produces `svg-v` tags, while `packages/terminal` would
+produce `terminal-v` tags. No workflow changes are needed when adding a presenter.
+Use lowercase letters, numbers and single hyphens for presenter directory names.
 
-[data-excluded="true"] {
-  opacity: 0.3;
-}
-```
+Run **Prepare presenter release** on `main`, `next`, or `releases/vN`, entering
+the presenter directory name (such as `svg`) and a version increment. It opens a
+PR changing that package's version and the root lockfile. Merging creates its
+package-specific tag and stages the package on npm for maintainer approval.
+Packages are versioned independently; the private root is never staged.
 
-```javascript
-const dice = document.querySelectorAll('[data-die-type="fudge"]');
-for (const die of dice) {
-  console.log(Number(die.dataset.value), Number(die.dataset.faces));
-}
-```
+**Stage presenter packages on npm** runs when any presenter manifest changes on a
+release branch and selects the changed packages. Run it manually with a presenter
+name, or leave the name empty to stage all eligible packages. Private packages
+and development version `0.0.0` are skipped; the central workflow skips versions
+already published on npm. Prepare each package's first release before staging it.
 
-Selectors work when the SVG is inserted inline in the document. Values remain
-in the metadata when `showValues` is false; that option only hides visible text.
+`main` stages stable versions as `latest`; `next` requires prereleases and uses
+`next`; maintenance branches keep their major version and use `release-N`.
+Tests, TypeScript checks, formatting and the local demo build run before staging.
+Versioning, validation, tag creation and npm staging are maintained centrally;
+`select-presenters.yml` only discovers which packages to pass to those workflows.
 
-## Selecting dice pools
-
-Every pool has a `g.dice-pool-result` wrapper with `data-pool="true"`.
-It contains the pool's parentheses, dice and descriptions. A transparent hit area
-lets blank spaces show the pool tooltip; dice and modifier icons keep their own
-more specific tooltips. Pools inside a group member retain both nested wrappers.
-
-| Attribute            | Meaning                                                            |
-| -------------------- | ------------------------------------------------------------------ |
-| `data-notation`      | Canonical pool notation, including modifiers, without descriptions |
-| `data-quantity`      | Initial evaluated dice quantity                                    |
-| `data-result-count`  | Number of resulting dice, including generated and dropped results  |
-| `data-counted-count` | Results whose own `useInTotal` flag is true                        |
-| `data-value`         | Pool value after its own modifiers                                 |
-
-For example, a pool tooltip can show
-`Dice pool: 3d8kh1; 3 results; 1 counted; total 8`.
-Counts refer to the resulting snapshot, rather than discarded reroll attempts.
-A pool in a dropped group member retains its own value and counted results; its
-tooltip additionally notes exclusion by the enclosing group. The group member's
-tooltip reports its effective contribution. Metadata and hover areas remain
-available when visible labels, values, notation or totals are hidden.
-
-```javascript
-const pools = document.querySelectorAll('g[data-pool="true"]');
-```
-
-## Hover highlights
-
-Inline SVG highlights the most specific pool, group member or roll group under
-pointer hover with a faint fill and rounded outline. Hover a pool's dice or blank
-space for the pool highlight; hover an operator between pools for the member;
-hover group braces, commas or its description for the whole group. Ancestor
-highlights are suppressed while a nested region is hovered, including nested
-roll groups. Dice and modifier icons retain their own tooltips.
-
-Whole groups use `g.roll-group-result[data-group="true"]`, with `data-notation`,
-`data-member-count`, `data-counted-count` and `data-value`. These wrappers remain
-available when descriptions, labels, icons or totals are hidden.
-
-```css
-.result-preview {
-  --result-hover-color: currentColor;
-  --result-hover-fill-opacity: 0.05;
-  --result-hover-stroke-opacity: 0.45;
-}
-
-/* Hide visual highlights while retaining hover areas and tooltips. */
-.result-preview.no-highlights {
-  --result-hover-fill-opacity: 0;
-  --result-hover-stroke-opacity: 0;
-}
-```
-
-Highlight outlines do not intercept pointer events or reserve layout space.
-The SVG includes the CSS, using `:hover` and `:has()` in supporting browsers;
-external page styles can customise an SVG embedded inline. An SVG used through
-`<img>` does not expose these interactive regions to the containing page.
-
-## Matching mathematical parentheses
-
-Hover a function name or either of its parentheses to brighten the name and both
-parentheses together. Hover either
-mathematical grouping parenthesis to brighten its matching partner. Arguments
-and nested pairs do not trigger the outer pair. Dice-pool parentheses retain
-only their existing pool highlight.
-
-This includes parentheses inserted by the presenter to preserve precedence.
-No font-size or weight changes are used, so the highlight does not shift text.
-Function and grouping scopes use `g.math-group-result` with `data-math-group`
-set to `function` or `parentheses`. Functions also expose `data-function`.
-These effects use CSS `:has()` and require an interactive SVG.
-
-```css
-.result-preview {
-  --math-hover-color: #bda0ff;
-}
-```
-
-## Optional labels and totals
-
-These appearance options default to `true`. Set any to `false` to hide that
-part of the output; hidden labels do not reserve their usual layout space.
-
-| Option               | Controls                                              |
-| -------------------- | ----------------------------------------------------- |
-| `showDiceLabels`     | Die notation below each icon                          |
-| `showModifierLabels` | Modifier labels below dice and group modifier markers |
-| `showNotation`       | The supplied notation above each roll                 |
-| `showTotals`         | Individual roll totals and the history total          |
-
-```typescript
-const presenter = new SvgPresenter(artwork, {
-  showDiceLabels: false,
-  showModifierLabels: false,
-  showNotation: false,
-  showTotals: false,
-});
-```
-
-Tooltips, `data-*` attributes, exclusion styling and calculated results remain
-available independently of these visibility options.
-
-## Modifier icons
-
-The presenter displays open line symbols for explosions, compound and penetrating
-explosions, rerolls, unique, min/max, target successes/failures, and critical
-successes/failures. Critical success uses a star; critical failure uses a skull.
-Compound explosions show overlapping purple and amber bursts. Combined compound
-and penetrate outcomes show two separate symbols. Dropped results remain faded
-and crossed out. Keep and sort do not need additional icons.
-
-```typescript
-const presenter = new SvgPresenter(artwork, {
-  showModifierIcons: true,
-  modifierIconPosition: "below", // "corner" (default) or "below"
-});
-```
-
-`showModifierIcons` is independent of `showModifierLabels`. Once and limited
-variants share their family's symbol; labels and tooltips retain their details.
-Icons represent actual result flags, rather than every modifier in the notation.
-A uniqueness icon means a duplicate was rerolled, not that uniqueness is guaranteed.
-Group modifier labels are smaller captions centred beneath the whole member and wrap
-within its width. Group member flags are displayed on that member, without repeating them on every
-nested die. Icons wrap into additional rows when needed.
-
-Corner placement cuts transparent circular gaps out of the artwork behind each
-symbol. It does not paint a background colour. Below placement generates no
-artwork cutouts; the compound symbol still masks its rear burst internally.
-Every render generates unique mask identifiers, so multiple outputs can share a
-page safely. Keep the generated definitions with their SVG.
-
-Each icon has `data-modifier` and a matching `modifier-*` class. Values are:
-`explode`, `compound`, `penetrate`, `re-roll`, `unique`, `min`, `max`,
-`target-success`, `target-failure`, `critical-success`, and `critical-failure`.
-Icons remain meaningful in monochrome. Colours can be overridden with CSS:
-
-```css
-.result-preview {
-  --modifier-explode-color: #9b5d0a;
-  --modifier-critical-success-color: #96700b;
-}
-
-/* One colour for all symbols, including compound's rear burst. */
-.result-preview.monochrome {
-  --modifier-icon-color: currentColor;
-}
-```
-
-Every icon family supports `--modifier-{data-modifier}-color`. Compound's rear
-burst follows `--modifier-explode-color`. The demo includes placement, visibility
-and monochrome controls, plus fixed examples of every modifier family.
+Configure npm trusted publishing separately for each package, pointing to
+`dice-roller/presenters` and `publish.yml`, with staged publishing permitted.
+GitHub Actions must be allowed to create pull requests. For protected release
+tags, set `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY` for the release app;
+otherwise tagging uses the workflow token. No packages are published by CI checks
+or by pushes to feature branches.
