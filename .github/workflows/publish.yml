@@ -1,21 +1,36 @@
-name: Publish to npm
+name: Stage presenter packages on npm
 
 on:
   push:
-    branches: [main, next, 'releases/v*']
-    # Do not stage an unchanged package just because workflows or docs change.
-    paths: ['package.json']
+    branches: [main, next, "releases/v*"]
+    paths: ["packages/*/package.json"]
   workflow_dispatch:
+    inputs:
+      workspace:
+        description: Presenter directory name; leave empty to stage all eligible packages
+        required: false
+        type: string
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  publish:
+  select:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/next' || startsWith(github.ref, 'refs/heads/releases/v')
+    uses: ./.github/workflows/select-presenters.yml
+    with:
+      mode: stage
+      workspace: ${{ inputs.workspace || '' }}
+
+  stage:
+    needs: select
+    if: needs.select.outputs.has-packages == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     uses: dice-roller/.github/.github/workflows/npm-publish.yml@main
-    # Optional package-specific commands:
-    # with:
-    #   test-command: npm run test:coverage
-    #   build-command: npm run build
+    with:
+      package-directory: ${{ matrix.directory }}
+      build-command: npm run check

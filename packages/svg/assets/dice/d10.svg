@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+  class="die die-d10"
+  width="128" height="128" viewBox="0 0 100 100"
+  fill="none" stroke="currentColor" stroke-width="2.2"
+  stroke-linecap="round" stroke-linejoin="round"
+  role="img" aria-label="Ten-sided die">
+  <path class="die-outline" d="M50 5 88 37 94 62 50 95 6 62 12 37Z"/>
+  <path class="die-facets" stroke-width="1.4"
+    d="M50 5 22 57 50 76 78 57Z
+       M6 62 22 57
+       M78 57 94 62
+       M50 76V95"/>
+  <text class="die-value" data-slot="value"
+    x="50" y="49" text-anchor="middle" dominant-baseline="central"
+    font-size="22" data-max-width="35" fill="currentColor" stroke="none"></text>
+</svg>

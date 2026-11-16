@@ -1,50 +1,56 @@
-name: Prepare Release
+name: Prepare presenter release
 
 on:
   workflow_dispatch:
     inputs:
+      workspace:
+        description: Presenter directory name under packages (e.g. svg)
+        required: true
+        type: string
       bump:
         description: Version increment (restrictions depend on selected branch)
         required: true
         type: choice
         default: patch
-        options:
-          - patch
-          - minor
-          - major
-          - prerelease
-          - prepatch
-          - preminor
-          - premajor
+        options: [patch, minor, major, prerelease, prepatch, preminor, premajor]
       prerelease-id:
-        description: Prerelease identifier (e.g. beta or rc)
+        description: Prerelease identifier
         required: false
         type: string
         default: beta
   pull_request:
     types: [closed]
-    branches: [main, next, 'releases/v*']
+    branches: [main, next, "releases/v*"]
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  prepare:
-    if: github.event_name == 'workflow_dispatch'
-    uses: dice-roller/.github/.github/workflows/prepare-release.yml@main
-    with:
-      mode: prepare
-      bump: ${{ inputs.bump }}
-      prerelease-id: ${{ inputs.prerelease-id }}
-
-  tag:
+  select:
     if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.merged == true &&
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.event.pull_request.head.ref, 'release/prepare/') &&
-      contains(github.event.pull_request.body, '<!-- dice-roller-release-pr -->')
+      contains(github.event.pull_request.body, '<!-- dice-roller-release-pr -->'))
+    uses: ./.github/workflows/select-presenters.yml
+    with:
+      mode: ${{ github.event_name == 'workflow_dispatch' && 'prepare' || 'tag' }}
+      workspace: ${{ inputs.workspace || '' }}
+
+  release:
+    needs: select
+    if: needs.select.outputs.has-packages == 'true'
+    strategy:
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     uses: dice-roller/.github/.github/workflows/prepare-release.yml@main
     with:
-      mode: tag
+      mode: ${{ github.event_name == 'workflow_dispatch' && 'prepare' || 'tag' }}
+      package-directory: ${{ matrix.directory }}
+      tag-prefix: ${{ matrix.prefix }}
+      bump: ${{ inputs.bump || 'patch' }}
+      prerelease-id: ${{ inputs.prerelease-id || 'beta' }}
+      release-app-id: ${{ vars.RELEASE_APP_ID }}
+    secrets:
+      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
