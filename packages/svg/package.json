@@ -1,6 +1,6 @@
 {
   "name": "@dice-roller/svg-presenter",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "CSS-stylable SVG results for RPG Dice Roller.",
   "type": "module",
   "sideEffects": false,
