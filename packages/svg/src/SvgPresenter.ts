@@ -29,6 +29,10 @@ export type SvgHistory = Pick<HistoryData, "total"> & {
 
 export interface Appearance {
   readonly size: number;
+  /** SVG width in drawing units, including 24 units of padding on each side. */
+  readonly width?: number;
+  /** Keep each roll expression on one line and size the SVG to its contents. */
+  readonly noWrap?: boolean;
   readonly stroke: string;
   readonly fill: string;
   readonly filled: boolean;
@@ -270,8 +274,12 @@ export function renderSvg(
   const iconSize = Math.max(16, Math.min(38, size * 0.192));
   const visibleIcons = (flags: readonly string[]) =>
     appearance.showModifierIcons === false ? [] : modifierIcons(flags);
-  const width = 1040;
   const padding = 24;
+  const wrapWidth = appearance.width ?? 1040;
+  if (!Number.isFinite(wrapWidth) || wrapWidth <= padding * 2)
+    throw new Error("SVG width must be finite and greater than 48");
+  const noWrap = appearance.noWrap === true;
+  const availableWidth = noWrap ? Infinity : wrapWidth - padding * 2;
   const font = Math.max(14, Math.min(32, size * 0.2));
   const caption = Math.max(10, Math.min(16, size * 0.12));
   const showDiceLabels = appearance.showDiceLabels !== false;
@@ -711,13 +719,65 @@ export function renderSvg(
 
   const isHistory = "rolls" in target;
   const rolls = isHistory ? target.rolls : [target];
-  for (const [index, roll] of rolls.entries()) {
-    const start = y;
+  function notationLines(heading: string): string[] {
+    if (noWrap) return [heading.replace(/\s/g, " ")];
+    const lines: string[] = [];
+    let line = "";
+    let used = 0;
+    for (const character of heading) {
+      const next = proportionalTextWidth(character, 14);
+      if (character === "\n" || (line && used + next > availableWidth)) {
+        lines.push(line);
+        line = "";
+        used = 0;
+      }
+      if (character !== "\n") {
+        line += character;
+        used += next;
+      }
+    }
+    lines.push(line);
+    return lines;
+  }
+
+  // Measure all rolls first so histories share a width and full-width dividers.
+  const prepared = rolls.map((roll, index) => {
     const heading = isHistory
       ? `${index + 1}. ${roll.notation}`
       : roll.notation;
-    // Wrap notation as text as well as wrapping the visual expression.
-    const chunks = heading.match(/.{1,100}/g) ?? [heading];
+    return {
+      roll,
+      chunks: showNotation ? notationLines(heading) : [],
+      expression: layout(
+        tokens(
+          roll.result,
+          false,
+          0,
+          appearance.showDescriptions !== false,
+          showModifierLabels,
+        ),
+        availableWidth,
+      ),
+    };
+  });
+  const totalWidth = (value: number) =>
+    proportionalTextWidth(`Total: ${value}`, 20) * 1.15;
+  const contentWidth = prepared.reduce(
+    (widest, { roll, chunks, expression }) =>
+      Math.max(
+        widest,
+        expression.width,
+        ...chunks.map((chunk) => proportionalTextWidth(chunk, 14)),
+        showTotals ? totalWidth(roll.total) : 0,
+      ),
+    isHistory && showTotals
+      ? proportionalTextWidth(`History total: ${target.total}`, 20) * 1.15
+      : 1,
+  );
+  const width = noWrap ? Math.ceil(contentWidth + padding * 2) : wrapWidth;
+
+  for (const { roll, chunks, expression } of prepared) {
+    const start = y;
     if (showNotation) {
       for (const chunk of chunks) {
         output.push(label(chunk, padding, y + 18, 'class="notation"'));
@@ -725,16 +785,6 @@ export function renderSvg(
       }
       y += 14;
     }
-    const expression = layout(
-      tokens(
-        roll.result,
-        false,
-        0,
-        appearance.showDescriptions !== false,
-        showModifierLabels,
-      ),
-      width - padding * 2,
-    );
     output.push(expression.paint(padding, y));
     y += expression.height;
     if (showTotals) {
@@ -776,6 +826,8 @@ export class SvgPresenter implements Presenter<string> {
     this.artwork = Object.freeze({ ...defaultArtwork, ...artwork });
     this.appearance = Object.freeze({
       size: 140,
+      width: 1040,
+      noWrap: false,
       stroke: "#7962b5",
       fill: "#eee7fb",
       filled: false,

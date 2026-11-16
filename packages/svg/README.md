@@ -63,6 +63,29 @@ descriptions follow the pool or group; block descriptions sit above it and wrap
 as needed. Set `showDescriptions: false` to hide them. The local demo includes
 nested examples and a matching appearance control.
 
+## Width and wrapping
+
+`width` sets the SVG drawing width, including 24 units of padding on each side.
+It defaults to `1040`. Results and notation wrap to fit that width. The value
+must be finite and greater than `48`.
+
+```typescript
+const presenter = new SvgPresenter({ width: 800 });
+```
+
+Use `noWrap: true` to keep each roll expression on a single line. The SVG then
+sizes itself to its contents; `width` does not constrain it. Histories still
+place each roll separately, and labels, descriptions and modifier flags retain
+their own layout around the dice.
+
+```typescript
+const presenter = new SvgPresenter({ noWrap: true });
+```
+
+These are SVG drawing units, not the containing element's pixel width. CSS can
+scale the output, but does not recalculate wrapping. A wide, unwrapped SVG can
+be placed inside a horizontally scrolling container to retain readable dice.
+
 ## Selecting dice
 
 Each rendered die has `data-*` attributes on its enclosing `<g>`, covering its

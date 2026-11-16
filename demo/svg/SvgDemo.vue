@@ -27,6 +27,8 @@ const modifierIconPosition = ref<"corner" | "below">("corner");
 const monochromeModifiers = ref(false);
 const showNotation = ref(true);
 const showTotals = ref(true);
+const width = ref(1040);
+const noWrap = ref(false);
 const sizes = {
   "x-small": 40,
   small: 80,
@@ -60,6 +62,9 @@ const presenter = computed(
   () =>
     new SvgPresenter({
       size: sizes[size.value],
+      width:
+        Number.isFinite(width.value) && width.value > 48 ? width.value : 1040,
+      noWrap: noWrap.value,
       stroke: stroke.value,
       fill: fill.value,
       filled: filled.value,
@@ -175,6 +180,20 @@ const modifierLegend = [
           </option>
         </select>
       </label>
+      <label>
+        SVG width
+        <input
+          v-model.number="width"
+          type="number"
+          min="49"
+          step="10"
+          :disabled="noWrap"
+        />
+      </label>
+      <label
+        ><input v-model="noWrap" type="checkbox" /> Keep each roll on one
+        line</label
+      >
       <label>Outline colour <input v-model="stroke" type="color" /></label>
       <label>Fill colour <input v-model="fill" type="color" /></label>
       <label><input v-model="filled" type="checkbox" /> Fill dice</label>
