@@ -113,7 +113,7 @@ test("hover regions follow nested groups, members and pools without intercepting
     // Suppression includes nested groups as well as pools and members.
     assert.ok(
       svg.includes(
-        ":hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result):hover))>.result-hover-outline",
+        ":hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result,.comparison-result,.conditional-result,.conditional-part-result):hover))>.result-hover-outline",
       ),
     );
   }

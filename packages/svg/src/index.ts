@@ -4,6 +4,7 @@ export type {
   Appearance,
   SvgHistory,
   SvgRoll,
+  SvgExpressionResult,
   SvgPresenterOptions,
 } from "./SvgPresenter.js";
 

@@ -22,7 +22,31 @@ import type {
 
 type PoolResult = results.PoolResult;
 type ScoredItem = results.ScoredItem;
-export type SvgRoll = Pick<RollData, "notation" | "total" | "result">;
+export type SvgExpressionResult =
+  | ExpressionResult
+  | {
+      readonly type: "comparison";
+      readonly node: { readonly op: ast.CompareOperator };
+      readonly value: number;
+      readonly left: SvgExpressionResult;
+      readonly right: SvgExpressionResult;
+    }
+  | {
+      readonly type: "conditional";
+      readonly node: unknown;
+      readonly value: number;
+      readonly condition: SvgExpressionResult;
+      readonly selectedBranch: "true" | "false";
+      readonly selectedResult: SvgExpressionResult;
+    }
+  | {
+      readonly type: "condition-reference";
+      readonly node: unknown;
+      readonly value: number;
+    };
+export type SvgRoll = Pick<RollData, "notation" | "total"> & {
+  readonly result: SvgExpressionResult;
+};
 export type SvgHistory = Pick<HistoryData, "total"> & {
   readonly rolls: readonly SvgRoll[];
 };
@@ -52,6 +76,23 @@ export interface SvgPresenterOptions extends Partial<Appearance> {
 }
 
 type Token =
+  | {
+      kind: "comparison";
+      children: Token[];
+      operator: string;
+      value: number;
+      excluded: boolean;
+    }
+  | {
+      kind: "conditional";
+      condition: Token[];
+      selected: Token[];
+      conditionValue: number;
+      selectedBranch: "true" | "false";
+      value: number;
+      excluded: boolean;
+    }
+  | { kind: "reference"; value: number; excluded: boolean }
   | { kind: "math-group"; children: Token[]; name?: string }
   | {
       kind: "group";
@@ -121,7 +162,7 @@ function markers(item: ScoredItem): string {
 }
 
 function tokens(
-  result: ExpressionResult,
+  result: SvgExpressionResult,
   excluded = false,
   minimum = 0,
   showDescriptions = true,
@@ -160,14 +201,17 @@ function tokens(
 }
 
 function expressionTokens(
-  result: ExpressionResult,
+  result: SvgExpressionResult,
   excluded = false,
   minimum = 0,
   showDescriptions = true,
   showModifierLabels = true,
 ): Token[] {
-  const visit = (node: ExpressionResult, dropped = excluded, precedence = 0) =>
-    tokens(node, dropped, precedence, showDescriptions, showModifierLabels);
+  const visit = (
+    node: SvgExpressionResult,
+    dropped = excluded,
+    precedence = 0,
+  ) => tokens(node, dropped, precedence, showDescriptions, showModifierLabels);
   const text = (value: string): Token => ({ kind: "text", value, excluded });
   const pair = (children: Token[], name?: string): Token[] => [
     {
@@ -196,6 +240,46 @@ function expressionTokens(
   switch (result.type) {
     case "number":
       return [text(String(result.value))];
+    case "condition-reference":
+      return [{ kind: "reference", value: result.value, excluded }];
+    case "comparison": {
+      const operator =
+        {
+          "<=": "≤",
+          ">=": "≥",
+          "!=": "≠",
+          "<>": "≠",
+          "<": "<",
+          ">": ">",
+          "=": "=",
+        }[result.node.op] ?? result.node.op;
+      const body: Token[] = [
+        {
+          kind: "comparison",
+          children: [
+            ...visit(result.left, excluded, 1),
+            text(operator),
+            ...visit(result.right, excluded, 1),
+          ],
+          operator: result.node.op,
+          value: result.value,
+          excluded,
+        },
+      ];
+      return minimum > 0 ? pair(body) : body;
+    }
+    case "conditional":
+      return [
+        {
+          kind: "conditional",
+          condition: visit(result.condition),
+          selected: visit(result.selectedResult),
+          conditionValue: result.condition.value,
+          selectedBranch: result.selectedBranch,
+          value: result.value,
+          excluded,
+        },
+      ];
     case "pool":
       return [
         text("("),
@@ -403,6 +487,100 @@ export function renderSvg(
   }
 
   function measure(token: Token, available: number): Box {
+    if (token.kind === "comparison") {
+      const child = layout(token.children, available);
+      const outcome = `${token.value !== 0 ? "true" : "false"} · ${token.value}`;
+      const boxWidth = Math.max(
+        child.width,
+        proportionalTextWidth(outcome, caption) + 16,
+      );
+      const inset = (boxWidth - child.width) / 2;
+      return {
+        ...child,
+        width: boxWidth,
+        height: child.height + caption * 1.5 + 8,
+        ...(child.diceLeft !== undefined
+          ? {
+              diceLeft: child.diceLeft + inset,
+              diceRight: child.diceRight! + inset,
+            }
+          : {}),
+        paint: (x, y) =>
+          `<g class="comparison-result" data-operator="${escape(token.operator)}" data-value="${token.value}" data-truth="${token.value !== 0}" data-excluded="${token.excluded}"><title>${escape(`Comparison: ${token.operator}; ${outcome}`)}</title><rect x="${x}" y="${y}" width="${boxWidth}" height="${child.height + caption * 1.5 + 8}" fill="transparent" pointer-events="all"/>${hoverOutline(x, y, boxWidth, child.height + caption * 1.5 + 8)}${child.paint(x + inset, y)}${label(outcome, x + boxWidth / 2, y + child.height + caption + 4, `class="decision-label comparison-outcome${token.excluded ? " excluded" : ""}" text-anchor="middle" font-size="${caption}"`)}</g>`,
+      };
+    }
+    if (token.kind === "conditional") {
+      const truth = token.conditionValue !== 0;
+      const pad = 10;
+      const headingHeight = caption * 1.5 + 6;
+      const gap = 32;
+      const card = (
+        children: Token[],
+        heading: string,
+        part: string,
+        details: string,
+      ): Box => {
+        const child = layout(children, Math.max(1, available - pad * 2));
+        const width = Math.max(
+          child.width + pad * 2,
+          proportionalTextWidth(heading, caption) + pad * 2,
+        );
+        return {
+          width,
+          height: child.height + headingHeight + pad * 2,
+          axis: headingHeight + pad + child.axis,
+          paint: (x, y) =>
+            `<g class="conditional-part-result" data-part="${part}"><title>${escape(details)}</title><rect class="conditional-card${token.excluded ? " excluded" : ""}" x="${x}" y="${y}" width="${width}" height="${child.height + headingHeight + pad * 2}" rx="8"/>${hoverOutline(x, y, width, child.height + headingHeight + pad * 2)}${label(heading, x + pad, y + pad + caption, `class="decision-label${token.excluded ? " excluded" : ""}" font-size="${caption}"`)}${child.paint(x + (width - child.width) / 2, y + headingHeight + pad)}</g>`,
+        };
+      };
+      const condition = card(
+        token.condition,
+        `IF · ${truth ? "true" : "false"}`,
+        "condition",
+        `Condition: ${token.conditionValue}; ${truth ? "true (non-zero)" : "false (zero)"}`,
+      );
+      const selected = card(
+        token.selected,
+        token.selectedBranch === "true" ? "THEN" : "ELSE",
+        "selected-branch",
+        `Selected branch; result ${token.value}`,
+      );
+      const horizontal = condition.width + gap + selected.width <= available;
+      const axis = horizontal
+        ? Math.max(condition.axis, selected.axis)
+        : condition.height + gap + selected.axis;
+      const leftY = horizontal ? axis - condition.axis : 0;
+      const rightX = horizontal ? condition.width + gap : 0;
+      const rightY = horizontal ? axis - selected.axis : condition.height + gap;
+      const width = horizontal
+        ? condition.width + gap + selected.width
+        : Math.max(condition.width, selected.width);
+      const height = Math.max(
+        leftY + condition.height,
+        rightY + selected.height,
+      );
+      const details = `Conditional: condition ${token.conditionValue} (${truth ? "true" : "false"}); ${token.selectedBranch === "true" ? "then" : "else"} branch selected; result ${token.value}; ${token.selectedBranch === "true" ? "else" : "then"} branch not evaluated`;
+      return {
+        width,
+        height,
+        axis,
+        paint: (x, y) =>
+          `<g class="conditional-result" data-condition-value="${token.conditionValue}" data-selected-branch="${token.selectedBranch}" data-value="${token.value}" data-layout="${horizontal ? "horizontal" : "vertical"}" data-excluded="${token.excluded}"><title>${escape(details)}</title><rect x="${x}" y="${y}" width="${width}" height="${height}" fill="transparent" pointer-events="all"/>${hoverOutline(x, y, width, height)}${condition.paint(x, y + leftY)}${label(horizontal ? "→" : "↓", x + (horizontal ? condition.width + gap / 2 : width / 2), y + (horizontal ? axis : condition.height + gap / 2), `class="decision-arrow${token.excluded ? " excluded" : ""}" text-anchor="middle" dominant-baseline="central" font-size="${font}"`)}${selected.paint(x + rightX, y + rightY)}</g>`,
+      };
+    }
+    if (token.kind === "reference") {
+      const width = Math.max(
+        String(token.value).length * font * 0.62 + 14,
+        proportionalTextWidth("$condition", caption) + 12,
+      );
+      return {
+        width,
+        height: font + caption * 1.5 + 12,
+        axis: font / 2 + 3,
+        paint: (x, y) =>
+          `<g class="condition-reference-result${token.excluded ? " excluded" : ""}" data-value="${token.value}"><title>${escape(`$condition: ${token.value}`)}</title><rect class="condition-reference-outline" x="${x + 2}" y="${y}" width="${width - 4}" height="${font + 6}" rx="5"/>${label(token.value, x + width / 2, y + font / 2 + 3, `class="math" text-anchor="middle" dominant-baseline="central" font-size="${font}"`)}${label("$condition", x + width / 2, y + font + caption + 8, `class="decision-label" text-anchor="middle" font-size="${caption}"`)}</g>`,
+      };
+    }
     if (token.kind === "math-group") {
       const child = layout(token.children, available);
       return {
@@ -810,7 +988,7 @@ export function renderSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="result-preview" role="img" aria-label="Dice results" style="color:${appearance.stroke};font-family:system-ui,sans-serif">
     <title>Dice results</title>
     <desc>Evaluated results with arithmetic, modifiers and individual dice.</desc>
-    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}${modifierIconStyles}.result-preview .result-hover-outline{fill:var(--result-hover-color,currentColor);fill-opacity:0;stroke:var(--result-hover-color,currentColor);stroke-opacity:0;stroke-width:1;pointer-events:none}.result-preview :is(.dice-pool-result,.group-member-result,.roll-group-result):hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result):hover))>.result-hover-outline{fill-opacity:var(--result-hover-fill-opacity,.05);stroke-opacity:var(--result-hover-stroke-opacity,.45)}.result-preview .math{fill:currentColor}.result-preview .math-group-result:has(>.math-delimiter:hover)>.math-delimiter .math{fill:var(--math-hover-color,var(--result-hover-color,currentColor));filter:brightness(1.6)}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
+    <style>.result-preview .die-outline{pointer-events:all;fill:${appearance.filled ? appearance.fill : "none"}}.result-preview .die-value{font-weight:600}${modifierIconStyles}.result-preview .decision-label,.result-preview .decision-arrow{fill:currentColor}.result-preview .decision-label{font-weight:500}.result-preview .conditional-card{fill:transparent;stroke:currentColor;stroke-opacity:.28;stroke-width:1;pointer-events:all}.result-preview .condition-reference-outline{fill:transparent;stroke:currentColor;stroke-opacity:.5;stroke-dasharray:3 2;pointer-events:all}.result-preview .result-hover-outline{fill:var(--result-hover-color,currentColor);fill-opacity:0;stroke:var(--result-hover-color,currentColor);stroke-opacity:0;stroke-width:1;pointer-events:none}.result-preview :is(.dice-pool-result,.group-member-result,.roll-group-result,.comparison-result,.conditional-result,.conditional-part-result):hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result,.comparison-result,.conditional-result,.conditional-part-result):hover))>.result-hover-outline{fill-opacity:var(--result-hover-fill-opacity,.05);stroke-opacity:var(--result-hover-stroke-opacity,.45)}.result-preview .math{fill:currentColor}.result-preview .math-group-result:has(>.math-delimiter:hover)>.math-delimiter .math{fill:var(--math-hover-color,var(--result-hover-color,currentColor));filter:brightness(1.6)}.result-preview .caption,.result-preview .badge,.result-preview .notation{fill:currentColor}.result-preview .notation{font-size:14px}.result-preview .description{font-weight:400;opacity:.8}.result-preview .total{fill:currentColor;font-size:20px;font-weight:700}.result-preview .excluded{opacity:.4}.result-preview .divider{stroke:currentColor;stroke-opacity:.15}</style>
     ${output.join("")}
 </svg>`;
 }
@@ -843,7 +1021,9 @@ export class SvgPresenter implements Presenter<string> {
     });
   }
 
-  present(target: Presentable | SvgHistory | SvgRoll): string {
+  present(
+    target: Presentable | SvgExpressionResult | SvgHistory | SvgRoll,
+  ): string {
     if ("type" in target) {
       return renderSvg(
         { notation: "Expression", result: target, total: target.value },
