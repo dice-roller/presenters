@@ -42,6 +42,11 @@ export interface Appearance {
   readonly showTotals?: boolean;
 }
 
+/** Appearance settings and optional per-shape SVG template overrides. */
+export interface SvgPresenterOptions extends Partial<Appearance> {
+  readonly artwork?: Readonly<Record<string, string>>;
+}
+
 type Token =
   | { kind: "math-group"; children: Token[]; name?: string }
   | {
@@ -766,10 +771,8 @@ export class SvgPresenter implements Presenter<string> {
   readonly appearance: Appearance;
 
   /** Supplied templates override individual shapes in the bundled artwork. */
-  constructor(
-    artwork: Readonly<Record<string, string>> = {},
-    appearance: Partial<Appearance> = {},
-  ) {
+  constructor(options: SvgPresenterOptions = {}) {
+    const { artwork, ...appearance } = options;
     this.artwork = Object.freeze({ ...defaultArtwork, ...artwork });
     this.appearance = Object.freeze({
       size: 140,

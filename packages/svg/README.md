@@ -32,16 +32,19 @@ by the local demo and are not package dependencies.
 The presenter bundles the default dice artwork as SVG strings. It works in Node
 and browsers without filesystem access, fetch requests or SVG import loaders.
 
-Pass only the shapes you want to override as the first constructor argument.
-Other shapes, including the generic fallback, retain their bundled defaults.
-Appearance settings remain the second argument; use `undefined` for the first
-argument when only changing appearance.
+Pass appearance settings in a single options object. To customise artwork, add
+only the shapes you want to override under `artwork`. Other shapes, including the
+generic fallback, retain their bundled defaults. `SvgPresenterOptions` is exported
+for reusable option objects.
 
 ```typescript
-const presenter = new SvgPresenter(undefined, { size: 100 });
+const presenter = new SvgPresenter({ size: 100 });
 
 // customD20Svg is your trusted SVG template string.
-const customised = new SvgPresenter({ d20: customD20Svg }, { size: 100 });
+const customised = new SvgPresenter({
+  size: 100,
+  artwork: { d20: customD20Svg },
+});
 ```
 
 Artwork keys are `d2`, `d4`, `d6`, `d8`, `d10`, `d12`, `d20` and `generic`.
@@ -198,7 +201,7 @@ part of the output; hidden labels do not reserve their usual layout space.
 | `showTotals`         | Individual roll totals and the history total          |
 
 ```typescript
-const presenter = new SvgPresenter(undefined, {
+const presenter = new SvgPresenter({
   showDiceLabels: false,
   showModifierLabels: false,
   showNotation: false,
@@ -219,7 +222,7 @@ and penetrate outcomes show two separate symbols. Dropped results remain faded
 and crossed out. Keep and sort do not need additional icons.
 
 ```typescript
-const presenter = new SvgPresenter(undefined, {
+const presenter = new SvgPresenter({
   showModifierIcons: true,
   modifierIconPosition: "below", // "corner" (default) or "below"
 });

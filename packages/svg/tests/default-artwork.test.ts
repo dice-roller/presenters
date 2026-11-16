@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Roll } from "@dice-roller/rpg-dice-roller";
+import type { SvgPresenterOptions } from "../dist/index.js";
 import { defaultArtwork, SvgPresenter } from "../dist/index.js";
 
 const notation = "d2 + d4 + d6 + d8 + d10 + d12 + d20 + d% + 3dF + d13";
@@ -46,7 +47,7 @@ test("one icon override retains all other defaults without mutating caller data"
     'class="die-outline custom-d20"',
   );
   const overrides = { d20: custom };
-  const presenter = new SvgPresenter(overrides, { size: 80 });
+  const presenter = new SvgPresenter({ size: 80, artwork: overrides });
   overrides.d20 = "changed afterwards";
   assert.equal(presenter.artwork.d20, custom);
   assert.equal(presenter.artwork.d6, defaultArtwork.d6);
@@ -56,6 +57,7 @@ test("one icon override retains all other defaults without mutating caller data"
   assert.equal(defaultArtwork.d20, original);
   assert.equal(new SvgPresenter().artwork.d20, original);
   assert.ok(Object.isFrozen(presenter.artwork));
+  assert.equal("artwork" in presenter.appearance, false);
 });
 
 test("fallback overrides and additional face-count artwork work independently", () => {
@@ -68,10 +70,10 @@ test("fallback overrides and additional face-count artwork work independently", 
     'class="die-outline custom-d13"',
   );
   const fallback = new Roll("d13").present(
-    new SvgPresenter({ generic: custom }),
+    new SvgPresenter({ artwork: { generic: custom } }),
   );
   assert.match(fallback, /custom-fallback/);
-  const presenter = new SvgPresenter({ d13: specific });
+  const presenter = new SvgPresenter({ artwork: { d13: specific } });
   const svg = new Roll("d13 + d17").present(presenter);
   assert.match(svg, /data-shape="d13"/);
   assert.match(svg, /custom-d13/);
@@ -79,11 +81,13 @@ test("fallback overrides and additional face-count artwork work independently", 
   assert.equal(presenter.artwork.generic, defaultArtwork.generic);
 });
 
-test("appearance-only settings and existing full-artwork calls remain supported", () => {
+test("appearance options and full artwork overrides share one options object", () => {
   const roll = new Roll("d6");
-  const appearance = { size: 80, showNotation: false };
-  const a = roll.present(new SvgPresenter(undefined, appearance));
-  const b = roll.present(new SvgPresenter(defaultArtwork, appearance));
+  const appearance: SvgPresenterOptions = { size: 80, showNotation: false };
+  const a = roll.present(new SvgPresenter(appearance));
+  const b = roll.present(
+    new SvgPresenter({ ...appearance, artwork: defaultArtwork }),
+  );
   assert.doesNotMatch(a, /class="notation"/);
   assert.match(a, /width="80" height="80"/);
   // Each output uses fresh mask identifiers; compare the remaining markup.

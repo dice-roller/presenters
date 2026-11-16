@@ -58,7 +58,7 @@ const icons = [
 
 const presenter = computed(
   () =>
-    new SvgPresenter(undefined, {
+    new SvgPresenter({
       size: sizes[size.value],
       stroke: stroke.value,
       fill: fill.value,
