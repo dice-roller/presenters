@@ -6,7 +6,7 @@ CSS-stylable SVG output for [RPG Dice Roller](https://github.com/dice-roller/rpg
 npm install @dice-roller/svg-presenter @dice-roller/rpg-dice-roller@next
 ```
 
-This package is not yet published. Run the local playground from the repository root with `npm run dev`, then open `/svg/`.
+Run the local playground from the repository root with `npm run dev`, then open `/svg/`.
 
 ## SVG presenter
 
@@ -14,9 +14,8 @@ This package is not yet published. Run the local playground from the repository 
 import { Roll } from "@dice-roller/rpg-dice-roller";
 import { SvgPresenter } from "@dice-roller/svg-presenter";
 
-// Supply SVG template strings, keyed by shape (d2, d4, d6, etc.).
-// Include a generic template for unsupported face counts.
-const presenter = new SvgPresenter(artwork, { size: 140 });
+// Standard dice artwork is included automatically.
+const presenter = new SvgPresenter();
 const svg = new Roll("2d6 + 3").present(presenter);
 ```
 
@@ -30,10 +29,31 @@ The dice roller is a peer dependency requiring v6 (including prereleases), and a
 development dependency using the published v6 beta. Vue and Vite are only used
 by the local demo and are not package dependencies.
 
-Import the blank dice artwork through the package's SVG exports, for example
-`@dice-roller/svg-presenter/icons/d20.svg`. With Vite, append `?raw` to import it
-as a template string. Supply all required artwork, including `generic`, to the
-presenter as shown above.
+The presenter bundles the default dice artwork as SVG strings. It works in Node
+and browsers without filesystem access, fetch requests or SVG import loaders.
+
+Pass only the shapes you want to override as the first constructor argument.
+Other shapes, including the generic fallback, retain their bundled defaults.
+Appearance settings remain the second argument; use `undefined` for the first
+argument when only changing appearance.
+
+```typescript
+const presenter = new SvgPresenter(undefined, { size: 100 });
+
+// customD20Svg is your trusted SVG template string.
+const customised = new SvgPresenter({ d20: customD20Svg }, { size: 100 });
+```
+
+Artwork keys are `d2`, `d4`, `d6`, `d8`, `d10`, `d12`, `d20` and `generic`.
+Percentile dice use `d10`, and Fudge dice use `d6`. Add a key such as `d13` to
+provide dedicated artwork for another face count, or override `generic` to
+change the fallback. Custom templates must include an empty
+`<text data-slot="value">` element as described in the [artwork guide](assets/dice/README.md).
+
+The frozen `defaultArtwork` map is also exported for galleries and direct
+`renderSvg` calls. Raw SVG assets remain available through exports such as
+`@dice-roller/svg-presenter/icons/d20.svg`; Vite users can append `?raw` when
+importing a custom template string.
 
 Pool and group descriptions are displayed once alongside their results. Inline
 descriptions follow the pool or group; block descriptions sit above it and wrap
@@ -178,7 +198,7 @@ part of the output; hidden labels do not reserve their usual layout space.
 | `showTotals`         | Individual roll totals and the history total          |
 
 ```typescript
-const presenter = new SvgPresenter(artwork, {
+const presenter = new SvgPresenter(undefined, {
   showDiceLabels: false,
   showModifierLabels: false,
   showNotation: false,
@@ -199,7 +219,7 @@ and penetrate outcomes show two separate symbols. Dropped results remain faded
 and crossed out. Keep and sort do not need additional icons.
 
 ```typescript
-const presenter = new SvgPresenter(artwork, {
+const presenter = new SvgPresenter(undefined, {
   showModifierIcons: true,
   modifierIconPosition: "below", // "corner" (default) or "below"
 });

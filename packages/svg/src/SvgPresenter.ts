@@ -8,6 +8,7 @@ import {
 import type { ModifierIconPosition } from "./modifier-icons.js";
 
 let presentationSequence = 0;
+import { defaultArtwork } from "./default-artwork.js";
 import { fillValueSlot } from "./value-slot.js";
 import { ast } from "@dice-roller/rpg-dice-roller";
 import type {
@@ -764,11 +765,12 @@ export class SvgPresenter implements Presenter<string> {
   readonly artwork: Readonly<Record<string, string>>;
   readonly appearance: Appearance;
 
+  /** Supplied templates override individual shapes in the bundled artwork. */
   constructor(
-    artwork: Readonly<Record<string, string>>,
+    artwork: Readonly<Record<string, string>> = {},
     appearance: Partial<Appearance> = {},
   ) {
-    this.artwork = Object.freeze({ ...artwork });
+    this.artwork = Object.freeze({ ...defaultArtwork, ...artwork });
     this.appearance = Object.freeze({
       size: 140,
       stroke: "#7962b5",
