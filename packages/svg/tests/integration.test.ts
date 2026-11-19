@@ -241,3 +241,38 @@ test("a real export/import round trip is still accepted by the presenter", () =>
   assert.deepEqual(imported.result, example.roll.result);
   assertMatchesCore(imported.present(new SvgPresenter()), imported);
 });
+
+test("matching explosions badge the triggering and failing dice separately", () => {
+  for (const [id, total, failures] of [
+    ["matching-explosion", 14, 0],
+    ["matching-explosion-failure", 0, 2],
+  ] as const) {
+    const definition = rollExampleDefinitions.find(
+      (example) => example.id === id,
+    );
+    assert.ok(definition);
+    const { roll } = createRollExample(definition);
+    assert.equal(roll.total, total);
+
+    const svg = roll.present(new SvgPresenter());
+    assert.equal(
+      (svg.match(/data-modifier="explode-matching-batch"/g) ?? []).length,
+      2,
+    );
+    assert.equal(
+      (svg.match(/data-modifier="explode-matching-batch-failure"/g) ?? [])
+        .length,
+      failures,
+    );
+    assert.match(svg, />!m(?: · score 0)?<\/text>/);
+    if (failures) {
+      assert.match(svg, /Matching batch failed\. Pool score reset to 0\./);
+      assert.match(svg, />!mf · score 0<\/text>/);
+    }
+    const labelsOnly = roll.present(
+      new SvgPresenter({ showModifierIcons: false }),
+    );
+    assert.doesNotMatch(labelsOnly, /data-modifier="explode-matching-batch/);
+    assert.match(labelsOnly, />!m(?: · score 0)?<\/text>/);
+  }
+});

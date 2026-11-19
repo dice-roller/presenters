@@ -113,6 +113,16 @@ const modifierLegend = [
     detail: "Triggered an additional roll.",
   },
   {
+    flag: "explode-matching-batch",
+    label: "Matching batch explosion",
+    detail: "The matching dice triggered another batch.",
+  },
+  {
+    flag: "explode-matching-batch-failure",
+    label: "Matching batch failure",
+    detail: "The matching batch reset the pool score to zero.",
+  },
+  {
     flag: "compound",
     label: "Compound",
     detail: "Explosion results are combined into one value.",

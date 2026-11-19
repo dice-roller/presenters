@@ -48,6 +48,8 @@ export const rollExampleDefinitions: readonly RollExampleDefinition[] = [
     seed: 1,
   },
   { id: "calculated-parameters", notation: "(d4 + 1)d(d6 + 2)", seed: 1 },
+  { id: "matching-explosion", notation: "2d6!m", seed: 1 },
+  { id: "matching-explosion-failure", notation: "2d6!mf=1", seed: 13 },
   { id: "limits-and-amounts", notation: "d6!2:2 + d6ro:2=1", seed: 240 },
   {
     id: "variable",

@@ -313,6 +313,10 @@ const presenter = new SvgPresenter({
 
 `showModifierIcons` is independent of `showModifierLabels`. Once and limited
 variants share their family's symbol; labels and tooltips retain their details.
+Matching batch explosions (`!m`) use a burst with two matching pips. The
+slashed burst marks a failed batch (`!mf`), where the modifier resets the pool's
+score to zero. Each badge appears on the dice flagged by the core.
+
 Icons represent actual result flags, rather than every modifier in the notation.
 A uniqueness icon means a duplicate was rerolled, not that uniqueness is guaranteed.
 Group modifier labels are smaller captions centred beneath the whole member and wrap
@@ -326,7 +330,8 @@ Every render generates unique mask identifiers, so multiple outputs can share a
 page safely. Keep the generated definitions with their SVG.
 
 Each icon has `data-modifier` and a matching `modifier-*` class. Values are:
-`explode`, `compound`, `penetrate`, `re-roll`, `unique`, `min`, `max`,
+`explode`, `explode-matching-batch`, `explode-matching-batch-failure`,
+`compound`, `penetrate`, `re-roll`, `unique`, `min`, `max`,
 `target-success`, `target-failure`, `critical-success`, and `critical-failure`.
 Icons remain meaningful in monochrome. Colours can be overridden with CSS:
 

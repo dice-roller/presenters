@@ -34,9 +34,9 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "@dice-roller/rpg-dice-roller": ">=6.0.0-beta.6"
+    "@dice-roller/rpg-dice-roller": ">=6.0.0-beta.7"
   },
   "devDependencies": {
-    "@dice-roller/rpg-dice-roller": "^6.0.0-beta.6"
+    "@dice-roller/rpg-dice-roller": "^6.0.0-beta.7"
   }
 }
