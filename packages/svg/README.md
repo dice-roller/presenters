@@ -22,8 +22,19 @@ const svg = new Roll("2d6 + 3").present(presenter);
 The presenter supports rolls, histories and expression results. It uses the core
 library's types and reads existing results without evaluating or rolling again.
 The SVG renderer and text-slot helper live in `packages/svg/src/`. The artwork
-gallery lives in `demo/svg/`, and shared fixed-result fixtures live in
-`packages/svg/tests/fixtures/`.
+gallery lives in `demo/svg/`. Demo result examples are real `Roll` instances
+created by `demo/svg/roll-examples.ts`, using an independent seeded engine per
+notation. Appearance changes reuse those rolls without evaluating again.
+
+`tests/integration.test.ts` runs every supported example through the installed
+core, then checks rendered dice values, flags, exclusions, quantities, counts and
+totals against the actual result tree. An exhaustive walk of the installed core's
+result union makes new/renamed result types a TypeScript error until integration
+coverage is updated. The suite also checks real histories, repeatable
+seeds, export/import and absence of extra random draws during presentation.
+
+Handwritten fixtures under `tests/fixtures/` are isolated layout/escaping tests;
+they are not used by the demo or presented as integration coverage.
 
 The dice roller is a peer dependency requiring v6 (including prereleases), and a
 development dependency using the published v6 beta. Vue and Vite are only used
@@ -99,8 +110,8 @@ Cards stack vertically when the configured width is too narrow. `noWrap: true`
 keeps the flow horizontal. Hover a card for its role and value; the complete
 conditional's tooltip also explains which branch was not evaluated.
 
-`$condition` displays its stored numeric value in a dashed outline with a small
-`$condition` label. It never renders the check's dice again. This also supports
+`$$condition` displays its stored numeric value in a dashed outline with a small
+`$$condition` label. It never renders the check's dice again. This also supports
 shorthand ternaries, nested bindings and dropped group members. Decision labels
 remain visible independently of dice labels and modifier labels.
 
@@ -110,13 +121,13 @@ Wrappers expose `comparison-result` (`data-operator`, `data-truth`, `data-value`
 `conditional-part-result` with `data-part="condition"` or `selected-branch`.
 They participate in the same most-specific hover highlighting as pools and groups.
 
-Parsing these notations requires a core release containing the features. The
-currently published `6.0.0-beta.5` predates them; the demo uses saved results from
-the core's `next` branch. The presenter accepts these result shapes without
-rolling, parsing or evaluating them. Once the core is updated, normal usage is:
+Comparisons, ternaries and references require dice roller `6.0.0-beta.6` or
+later. The demo and integration tests evaluate these examples through the core.
+Caller data references such as `$character.bonus` use the same value marker
+with their own notation.
 
 ```typescript
-new Roll("((d20)>=10) ? (2d8+$condition) : (d4)").present(new SvgPresenter());
+new Roll("((d20)>=10) ? (2d8+$$condition) : (d4)").present(new SvgPresenter());
 ```
 
 ## Selecting dice
@@ -317,4 +328,4 @@ Icons remain meaningful in monochrome. Colours can be overridden with CSS:
 
 Every icon family supports `--modifier-{data-modifier}-color`. Compound's rear
 burst follows `--modifier-explode-color`. The demo includes placement, visibility
-and monochrome controls, plus fixed examples of every modifier family.
+and monochrome controls, plus seeded real examples of the modifier families supported by the installed core.

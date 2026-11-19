@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { Roll, RollHistory } from "@dice-roller/rpg-dice-roller";
 import type { Presenter } from "@dice-roller/rpg-dice-roller";
 import { renderSvg, SvgPresenter } from "../dist/index.js";
-import { sampleResult, sampleRoll } from "./fixtures/sample-result.js";
+import { sampleResult, sampleRoll } from "./fixtures/rendering-results.js";
 
 const artwork = Object.fromEntries(
   ["d2", "d4", "d6", "d8", "d10", "d12", "d20", "generic"].map((name) => [

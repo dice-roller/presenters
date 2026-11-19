@@ -2,12 +2,14 @@
 import { computed, ref } from "vue";
 import DemoNav from "../DemoNav.vue";
 import { diceArtwork } from "./dice-artwork.js";
-import { decisionExamples } from "../../packages/svg/tests/fixtures/decision-examples.js";
-import { SvgPresenter } from "@dice-roller/svg-presenter";
 import {
-  sampleResult,
-  sampleRoll,
-} from "../../packages/svg/tests/fixtures/sample-result.js";
+  createRollExample,
+  createRollExamples,
+  createExampleHistory,
+  decisionExampleDefinitions,
+  singleRollDefinition,
+} from "./roll-examples.js";
+import { SvgPresenter } from "@dice-roller/svg-presenter";
 import { fillValueSlot } from "../../packages/svg/src/value-slot.js";
 import {
   modifierIcons,
@@ -79,14 +81,27 @@ const presenter = computed(
       showTotals: showTotals.value,
     }),
 );
-const singlePreview = computed(() => presenter.value.present(sampleRoll));
-const preview = computed(() => presenter.value.present(sampleResult));
-const decisionPreview = computed(() =>
-  presenter.value.present({
-    rolls: decisionExamples,
-    total: decisionExamples.reduce((sum, roll) => sum + roll.total, 0),
-  }),
+// Evaluate once when this playground mounts. Appearance controls only present.
+const examples = createRollExamples();
+const singleExample = createRollExample(singleRollDefinition);
+const history = createExampleHistory(examples);
+const decisionHistory = createExampleHistory(
+  decisionExampleDefinitions.map(createRollExample),
 );
+const singlePreview = computed(() =>
+  singleExample.roll.present(presenter.value),
+);
+const preview = computed(() => history.present(presenter.value));
+const decisionPreview = computed(() =>
+  decisionHistory.present(presenter.value),
+);
+// Serialise result trees directly: Roll.toJSON() also calculates extrema.
+const resultTrees = examples.map(({ id, roll }) => ({
+  id,
+  notation: roll.notation,
+  total: roll.total,
+  result: roll.result,
+}));
 
 const modifierLegend = [
   {
@@ -298,8 +313,8 @@ const modifierLegend = [
     <section class="presenter-preview" aria-labelledby="single-roll-heading">
       <h2 id="single-roll-heading">Single roll preview</h2>
       <p>
-        <code>2d20! + 3d8kh</code>: one d20 explodes for an extra roll, and only
-        the highest d8 contributes to the total.
+        <code>{{ singleExample.roll.notation }}</code
+        >: exploding d20s and only the highest d8 contributes to the total.
       </p>
       <div
         class="preview-output"
@@ -309,15 +324,15 @@ const modifierLegend = [
         v-html="singlePreview"
       />
       <details>
-        <summary>Fixed single roll object</summary>
-        <pre>{{ JSON.stringify(sampleRoll, null, 2) }}</pre>
+        <summary>Dice roller single-roll result</summary>
+        <pre>{{ JSON.stringify(singleExample.roll.result, null, 2) }}</pre>
       </details>
     </section>
 
     <section class="presenter-preview" aria-labelledby="presenter-heading">
       <h2 id="presenter-heading">Presenter output preview</h2>
       <p>
-        A fixed result object showing mixed dice, arithmetic, parentheses,
+        Real seeded rolls showing mixed dice, arithmetic, parentheses,
         functions, custom dice, keep/drop, explosions, rerolls, targets and
         criticals. Appearance changes reuse these results.
       </p>
@@ -335,16 +350,12 @@ const modifierLegend = [
         v-html="preview"
       />
       <details>
-        <summary>Fixed result object</summary>
-        <pre>{{ JSON.stringify(sampleResult, null, 2) }}</pre>
+        <summary>Dice roller result trees</summary>
+        <pre>{{ JSON.stringify(resultTrees, null, 2) }}</pre>
       </details>
     </section>
     <section class="presenter-preview" aria-labelledby="decisions-heading">
       <h2 id="decisions-heading">Comparisons and conditional rolls</h2>
-      <p>
-        The condition and selected branch use stored results. The other branch
-        is not evaluated.
-      </p>
       <div
         class="preview-output"
         :class="{ 'monochrome-modifiers': monochromeModifiers }"
