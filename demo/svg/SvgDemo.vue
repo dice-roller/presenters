@@ -24,6 +24,7 @@ const filled = ref(false);
 const showValues = ref(true);
 const showDescriptions = ref(true);
 const showDiceLabels = ref(true);
+const showVariableLabels = ref(true);
 const showModifierLabels = ref(true);
 const showModifierIcons = ref(true);
 const modifierIconPosition = ref<"corner" | "below">("corner");
@@ -74,6 +75,7 @@ const presenter = computed(
       showValues: showValues.value,
       showDescriptions: showDescriptions.value,
       showDiceLabels: showDiceLabels.value,
+      showVariableLabels: showVariableLabels.value,
       showModifierLabels: showModifierLabels.value,
       showModifierIcons: showModifierIcons.value,
       modifierIconPosition: modifierIconPosition.value,
@@ -96,8 +98,9 @@ const decisionPreview = computed(() =>
   decisionHistory.present(presenter.value),
 );
 // Serialise result trees directly: Roll.toJSON() also calculates extrema.
-const resultTrees = examples.map(({ id, roll }) => ({
+const resultTrees = examples.map(({ id, data, roll }) => ({
   id,
+  data,
   notation: roll.notation,
   total: roll.total,
   result: roll.result,
@@ -228,6 +231,10 @@ const modifierLegend = [
         ><input v-model="showDiceLabels" type="checkbox" /> Show dice
         labels</label
       >
+      <label>
+        <input v-model="showVariableLabels" type="checkbox" /> Show variable
+        labels
+      </label>
       <label
         ><input v-model="showModifierLabels" type="checkbox" /> Show modifier
         labels</label
@@ -333,8 +340,9 @@ const modifierLegend = [
       <h2 id="presenter-heading">Presenter output preview</h2>
       <p>
         Real seeded rolls showing mixed dice, arithmetic, parentheses,
-        functions, custom dice, keep/drop, explosions, rerolls, targets and
-        criticals. Appearance changes reuse these results.
+        functions, custom dice, keep/drop, explosions, rerolls, targets,
+        criticals and caller data variables. Appearance changes reuse these
+        results.
       </p>
       <p>
         Hover a pool, an operator between pools, or a group brace to highlight
@@ -350,7 +358,7 @@ const modifierLegend = [
         v-html="preview"
       />
       <details>
-        <summary>Dice roller result trees</summary>
+        <summary>Dice roller inputs and result trees</summary>
         <pre>{{ JSON.stringify(resultTrees, null, 2) }}</pre>
       </details>
     </section>

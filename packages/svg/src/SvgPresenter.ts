@@ -40,6 +40,8 @@ export interface Appearance {
   readonly showValues: boolean;
   readonly showDescriptions?: boolean;
   readonly showDiceLabels?: boolean;
+  /** Show the name beneath each variable value, including system references. */
+  readonly showVariableLabels?: boolean;
   readonly showModifierLabels?: boolean;
   readonly showModifierIcons?: boolean;
   readonly modifierIconPosition?: ModifierIconPosition;
@@ -351,6 +353,7 @@ export function renderSvg(
   const font = Math.max(14, Math.min(32, size * 0.2));
   const caption = Math.max(10, Math.min(16, size * 0.12));
   const showDiceLabels = appearance.showDiceLabels !== false;
+  const showVariableLabels = appearance.showVariableLabels !== false;
   const showModifierLabels = appearance.showModifierLabels !== false;
   const showNotation = appearance.showNotation !== false;
   const showTotals = appearance.showTotals !== false;
@@ -555,14 +558,16 @@ export function renderSvg(
     if (token.kind === "reference") {
       const width = Math.max(
         String(token.value).length * font * 0.62 + 14,
-        proportionalTextWidth(token.notation, caption) + 12,
+        showVariableLabels
+          ? proportionalTextWidth(token.notation, caption) + 12
+          : 0,
       );
       return {
         width,
-        height: font + caption * 1.5 + 12,
+        height: font + 6 + (showVariableLabels ? caption * 1.5 + 6 : 0),
         axis: font / 2 + 3,
         paint: (x, y) =>
-          `<g class="condition-reference-result${token.excluded ? " excluded" : ""}" data-value="${token.value}"><title>${escape(`${token.notation}: ${token.value}`)}</title><rect class="condition-reference-outline" x="${x + 2}" y="${y}" width="${width - 4}" height="${font + 6}" rx="5"/>${label(token.value, x + width / 2, y + font / 2 + 3, `class="math" text-anchor="middle" dominant-baseline="central" font-size="${font}"`)}${label(token.notation, x + width / 2, y + font + caption + 8, `class="decision-label" text-anchor="middle" font-size="${caption}"`)}</g>`,
+          `<g class="condition-reference-result${token.excluded ? " excluded" : ""}" data-value="${token.value}"><title>${escape(`${token.notation}: ${token.value}`)}</title><rect class="condition-reference-outline" x="${x + 2}" y="${y}" width="${width - 4}" height="${font + 6}" rx="5"/>${label(token.value, x + width / 2, y + font / 2 + 3, `class="math" text-anchor="middle" dominant-baseline="central" font-size="${font}"`)}${showVariableLabels ? label(token.notation, x + width / 2, y + font + caption + 8, `class="decision-label" text-anchor="middle" font-size="${caption}"`) : ""}</g>`,
       };
     }
     if (token.kind === "math-group") {
@@ -996,6 +1001,7 @@ export class SvgPresenter implements Presenter<string> {
       showValues: true,
       showDescriptions: true,
       showDiceLabels: true,
+      showVariableLabels: true,
       showModifierLabels: true,
       showModifierIcons: true,
       modifierIconPosition: "corner",

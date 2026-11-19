@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Roll, RollHistory, errors } from "@dice-roller/rpg-dice-roller";
+import { Roll, RollHistory, ast, errors } from "@dice-roller/rpg-dice-roller";
 import type { ExpressionResult, results } from "@dice-roller/rpg-dice-roller";
 import { SvgPresenter } from "../dist/index.js";
 import {
@@ -109,6 +109,21 @@ function assertMatchesCore(svg: string, roll: Roll<unknown>, totals = true) {
     assert.equal(attribute(rendered, "flags"), die.flags.join(" "));
     assert.equal(attribute(rendered, "use-in-total"), String(die.useInTotal));
     assert.equal(attribute(rendered, "excluded"), String(excluded));
+  }
+  const references = actual.filter(({ result }) => result.type === "reference");
+  const markers = [
+    ...svg.matchAll(
+      /<g class="condition-reference-result[^"]*"[^>]*><title>([^<]*)<\/title>/g,
+    ),
+  ];
+  assert.equal(markers.length, references.length, roll.notation);
+  for (const [index, { result }] of references.entries()) {
+    const marker = markers[index]!;
+    assert.equal(attribute(marker[0], "value"), String(result.value));
+    assert.equal(
+      marker[1],
+      `${ast.nodeToNotation(result.node)}: ${result.value}`,
+    );
   }
   if (totals) assert.ok(svg.includes(`Total: ${roll.total}</text>`));
   else assert.doesNotMatch(svg, /class="total"/);

@@ -1,17 +1,14 @@
-import {
-  Roll,
-  RollHistory,
-  engines,
-  errors,
-} from "@dice-roller/rpg-dice-roller";
+import type { RollInputData } from "@dice-roller/rpg-dice-roller";
+import { Roll, RollHistory, engines } from "@dice-roller/rpg-dice-roller";
 
 export interface RollExampleDefinition {
   readonly id: string;
   readonly notation: string;
   readonly seed: number;
+  readonly data?: RollInputData;
 }
 
-/** Only notation and RNG seeds are specified here; the core creates every result. */
+/** The core evaluates the notation using the supplied data and RNG seed. */
 export const rollExampleDefinitions: readonly RollExampleDefinition[] = [
   {
     id: "mixed",
@@ -52,6 +49,24 @@ export const rollExampleDefinitions: readonly RollExampleDefinition[] = [
   },
   { id: "calculated-parameters", notation: "(d4 + 1)d(d6 + 2)", seed: 1 },
   { id: "limits-and-amounts", notation: "d6!2:2 + d6ro:2=1", seed: 240 },
+  {
+    id: "variable",
+    notation: "d20 + $strength",
+    seed: 1,
+    data: { strength: 3 },
+  },
+  {
+    id: "nested-variable",
+    notation: "d6 + $skills.strength",
+    seed: 1,
+    data: { skills: { strength: 2.5 } },
+  },
+  {
+    id: "deep-variable",
+    notation: "2d6 + $attr.resistance.fire",
+    seed: 1,
+    data: { attr: { resistance: { fire: -1.25 } } },
+  },
 ];
 export const singleRollDefinition: RollExampleDefinition = {
   id: "single",
@@ -67,6 +82,7 @@ export function createRollExample(definition: RollExampleDefinition) {
   );
   let draws = 0;
   const roll = new Roll(definition.notation, {
+    data: definition.data,
     engine: {
       next() {
         draws++;

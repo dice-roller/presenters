@@ -130,6 +130,21 @@ with their own notation.
 new Roll("((d20)>=10) ? (2d8+$$condition) : (d4)").present(new SvgPresenter());
 ```
 
+## Caller data variables
+
+Pass your variables in the dice roller's `data` option. Single-dollar references
+such as `$strength` and `$attr.resistance.fire` show their resolved numeric value
+in a dashed outline, with the original path below it. Set
+`showVariableLabels: false` to hide the path beneath the value. This also hides
+the label beneath `$$condition` values. Hovering still shows the name and value.
+
+```typescript
+const roll = new Roll("2d6 + $strength + $attr.resistance.fire", {
+  data: { strength: 3, attr: { resistance: { fire: -1.25 } } },
+});
+const svg = roll.present(new SvgPresenter());
+```
+
 ## Selecting dice
 
 Each rendered die has `data-*` attributes on its enclosing `<g>`, covering its
@@ -263,6 +278,7 @@ part of the output; hidden labels do not reserve their usual layout space.
 | Option               | Controls                                              |
 | -------------------- | ----------------------------------------------------- |
 | `showDiceLabels`     | Die notation below each icon                          |
+| `showVariableLabels` | Names below variable and system reference values      |
 | `showModifierLabels` | Modifier labels below dice and group modifier markers |
 | `showNotation`       | The supplied notation above each roll                 |
 | `showTotals`         | Individual roll totals and the history total          |
