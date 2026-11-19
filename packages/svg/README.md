@@ -134,7 +134,9 @@ new Roll("((d20)>=10) ? (2d8+$$condition) : (d4)").present(new SvgPresenter());
 
 Pass your variables in the dice roller's `data` option. Single-dollar references
 such as `$strength` and `$attr.resistance.fire` show their resolved numeric value
-in a dashed outline, with the original path below it.
+in a dashed outline, with the original path below it. Set
+`showVariableLabels: false` to hide the path beneath the value. This also hides
+the label beneath `$$condition` values. Hovering still shows the name and value.
 
 ```typescript
 const roll = new Roll("2d6 + $strength + $attr.resistance.fire", {
@@ -276,6 +278,7 @@ part of the output; hidden labels do not reserve their usual layout space.
 | Option               | Controls                                              |
 | -------------------- | ----------------------------------------------------- |
 | `showDiceLabels`     | Die notation below each icon                          |
+| `showVariableLabels` | Names below variable and system reference values      |
 | `showModifierLabels` | Modifier labels below dice and group modifier markers |
 | `showNotation`       | The supplied notation above each roll                 |
 | `showTotals`         | Individual roll totals and the history total          |

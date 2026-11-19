@@ -24,6 +24,7 @@ const filled = ref(false);
 const showValues = ref(true);
 const showDescriptions = ref(true);
 const showDiceLabels = ref(true);
+const showVariableLabels = ref(true);
 const showModifierLabels = ref(true);
 const showModifierIcons = ref(true);
 const modifierIconPosition = ref<"corner" | "below">("corner");
@@ -74,6 +75,7 @@ const presenter = computed(
       showValues: showValues.value,
       showDescriptions: showDescriptions.value,
       showDiceLabels: showDiceLabels.value,
+      showVariableLabels: showVariableLabels.value,
       showModifierLabels: showModifierLabels.value,
       showModifierIcons: showModifierIcons.value,
       modifierIconPosition: modifierIconPosition.value,
@@ -229,6 +231,10 @@ const modifierLegend = [
         ><input v-model="showDiceLabels" type="checkbox" /> Show dice
         labels</label
       >
+      <label>
+        <input v-model="showVariableLabels" type="checkbox" /> Show variable
+        labels
+      </label>
       <label
         ><input v-model="showModifierLabels" type="checkbox" /> Show modifier
         labels</label

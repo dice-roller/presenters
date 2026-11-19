@@ -145,3 +145,31 @@ test("caller data references retain their notation and resolved value", () => {
   assert.match(svg, />\$character\.bonus<\/text>/);
   assert.match(svg, />Total: 5<\/text>/);
 });
+
+test("variable labels can be hidden while retaining values and tooltips", () => {
+  for (const [roll, notation] of [
+    [
+      new Roll("$attr.resistance.fire", {
+        data: { attr: { resistance: { fire: -1.25 } } },
+      }),
+      "$attr.resistance.fire",
+    ],
+    [new Roll("(2) ? ($$condition) : (0)"), "$$condition"],
+  ] as const) {
+    const options = { noWrap: true, showNotation: false, showTotals: false };
+    const labelled = roll.present(new SvgPresenter(options));
+    const hidden = roll.present(
+      new SvgPresenter({
+        ...options,
+        showVariableLabels: false,
+      }),
+    );
+
+    assert.ok(labelled.includes(`>${notation}</text>`));
+    assert.ok(!hidden.includes(`>${notation}</text>`));
+    assert.ok(hidden.includes(`<title>${notation}: ${roll.total}</title>`));
+    assert.ok(hidden.includes(`>${roll.total}</text>`));
+    assert.match(hidden, /<rect class="condition-reference-outline"/);
+    if (notation === "$$condition") assert.match(hidden, />THEN<\/text>/);
+  }
+});
