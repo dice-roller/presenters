@@ -16,6 +16,7 @@ import {
   modifierIconStyles,
   renderModifierIcon,
 } from "../../packages/svg/src/modifier-icons.js";
+
 const { d2, d4, d6, d8, d10, d12, d20, generic } = diceArtwork;
 
 const stroke = ref("#7962b5");
@@ -187,6 +188,7 @@ const modifierLegend = [
         `modifier-legend-${index}`,
       )
     : `<g opacity=".4" fill="none" stroke="currentColor" stroke-width="2.2"><g transform="translate(3 3) scale(.3)">${fillValueSlot(artwork(d6), "4")}<path d="M14 50h72"/></g></g>`;
+
   return {
     ...entry,
     symbol: `<svg class="result-preview" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 36" width="45" height="36" aria-hidden="true"><style>${modifierIconStyles}</style>${symbol}</svg>`,
@@ -312,6 +314,7 @@ const modifierLegend = [
       >
         <li v-for="entry in modifierLegend" :key="entry.flag">
           <span class="modifier-legend-symbol" v-html="entry.symbol" />
+
           <div>
             <strong>{{ entry.label }}</strong>
             <code>{{ entry.flag }}</code>
@@ -319,6 +322,7 @@ const modifierLegend = [
           </div>
         </li>
       </ul>
+
       <p>
         Flags can combine, for example compound and penetrate. Once variants
         share their family's icon. Keep marks excluded results as dropped;

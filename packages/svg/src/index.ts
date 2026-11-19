@@ -9,3 +9,4 @@ export type {
 } from "./SvgPresenter.js";
 
 export type { ModifierIconPosition } from "./modifier-icons.js";
+export { modifierIconStyles, renderModifierIcon } from "./modifier-icons.js";

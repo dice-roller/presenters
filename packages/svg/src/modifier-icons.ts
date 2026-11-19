@@ -88,14 +88,25 @@ const definitions: Record<
 export function modifierIcons(flags: readonly string[]): ModifierIcon[] {
   const icons: ModifierIcon[] = [];
   const add = (name: ModifierIcon) => {
-    if (!icons.includes(name)) icons.push(name);
+    if (!icons.includes(name)) {
+      icons.push(name);
+    }
   };
+
   for (const flag of flags) {
-    if (flag === "explode" && flags.includes("compound")) continue;
-    if (flag === "re-roll-once") add("re-roll");
-    else if (flag === "unique-once") add("unique");
-    else if (Object.hasOwn(definitions, flag)) add(flag as ModifierIcon);
+    if (flag === "explode" && flags.includes("compound")) {
+      continue;
+    }
+
+    if (flag === "re-roll-once") {
+      add("re-roll");
+    } else if (flag === "unique-once") {
+      add("unique");
+    } else if (Object.hasOwn(definitions, flag)) {
+      add(flag as ModifierIcon);
+    }
   }
+
   return icons;
 }
 
@@ -130,20 +141,28 @@ export function layoutModifierIcons(
   iconSize: number,
   position: ModifierIconPosition,
 ): ModifierIconLayout {
-  if (!kinds.length) return { items: [], top: 0, bottom: 0, padding: 6 };
+  if (!kinds.length) {
+    return { items: [], top: 0, bottom: 0, padding: 6 };
+  }
+
   const gap = Math.max(4, iconSize * 0.2);
   const rows: { kind: ModifierIcon; width: number }[][] = [[]];
   let used = 0;
+
   for (const kind of kinds) {
     const iconWidth = iconSize * (kind === "compound" ? 1.3 : 1);
+
     if (used && used + gap + iconWidth > width) {
       rows.push([]);
       used = 0;
     }
+
     rows[rows.length - 1]!.push({ kind, width: iconWidth });
     used += (used ? gap : 0) + iconWidth;
   }
+
   const items: PlacedModifierIcon[] = [];
+
   for (const [index, row] of rows.entries()) {
     const rowWidth =
       row.reduce((sum, item) => sum + item.width, 0) + (row.length - 1) * gap;
@@ -155,11 +174,13 @@ export function layoutModifierIcons(
       position === "corner"
         ? -iconSize / 2 - index * (iconSize + gap)
         : height + 6 + index * (iconSize + gap);
+
     for (const item of row) {
       items.push({ ...item, x, y, height: iconSize });
       x += item.width + gap;
     }
   }
+
   return {
     items,
     top:
@@ -194,9 +215,12 @@ export function renderModifierIcon(
   const { kind, width, height } = icon;
   const definition = definitions[kind];
   let body = definition.body;
+
   if (kind === "compound") {
     body = `<defs><mask id="${id}" class="modifier-overlap-mask" maskUnits="userSpaceOnUse" x="-2" y="-5" width="48" height="40"><rect x="-2" y="-5" width="48" height="40" fill="white" stroke="none"/><path d="${burst}" fill="black" stroke="black" stroke-width="1.8"/></mask></defs><g mask="url(#${id})"><path class="modifier-compound-back" stroke="#9b5d0a" transform="translate(10 -2)" d="${burst}"/></g><path d="${burst}"/>`;
   }
+
   const box = kind === "compound" ? "0 -3 43 35" : "0 0 32 32";
+
   return `<svg class="modifier-icon modifier-${kind}" data-modifier="${kind}" color="${definition.colour}" x="${x + icon.x}" y="${y + icon.y}" width="${width}" height="${height}" viewBox="${box}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="${definition.title}"><title>${definition.title}</title><rect x="0" y="${kind === "compound" ? -3 : 0}" width="${kind === "compound" ? 43 : 32}" height="${kind === "compound" ? 35 : 32}" fill="transparent" stroke="none"/>${body}</svg>`;
 }
