@@ -96,8 +96,9 @@ const decisionPreview = computed(() =>
   decisionHistory.present(presenter.value),
 );
 // Serialise result trees directly: Roll.toJSON() also calculates extrema.
-const resultTrees = examples.map(({ id, roll }) => ({
+const resultTrees = examples.map(({ id, data, roll }) => ({
   id,
+  data,
   notation: roll.notation,
   total: roll.total,
   result: roll.result,
@@ -333,8 +334,9 @@ const modifierLegend = [
       <h2 id="presenter-heading">Presenter output preview</h2>
       <p>
         Real seeded rolls showing mixed dice, arithmetic, parentheses,
-        functions, custom dice, keep/drop, explosions, rerolls, targets and
-        criticals. Appearance changes reuse these results.
+        functions, custom dice, keep/drop, explosions, rerolls, targets,
+        criticals and caller data variables. Appearance changes reuse these
+        results.
       </p>
       <p>
         Hover a pool, an operator between pools, or a group brace to highlight
@@ -350,7 +352,7 @@ const modifierLegend = [
         v-html="preview"
       />
       <details>
-        <summary>Dice roller result trees</summary>
+        <summary>Dice roller inputs and result trees</summary>
         <pre>{{ JSON.stringify(resultTrees, null, 2) }}</pre>
       </details>
     </section>

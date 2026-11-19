@@ -130,6 +130,19 @@ with their own notation.
 new Roll("((d20)>=10) ? (2d8+$$condition) : (d4)").present(new SvgPresenter());
 ```
 
+## Caller data variables
+
+Pass your variables in the dice roller's `data` option. Single-dollar references
+such as `$strength` and `$attr.resistance.fire` show their resolved numeric value
+in a dashed outline, with the original path below it.
+
+```typescript
+const roll = new Roll("2d6 + $strength + $attr.resistance.fire", {
+  data: { strength: 3, attr: { resistance: { fire: -1.25 } } },
+});
+const svg = roll.present(new SvgPresenter());
+```
+
 ## Selecting dice
 
 Each rendered die has `data-*` attributes on its enclosing `<g>`, covering its
