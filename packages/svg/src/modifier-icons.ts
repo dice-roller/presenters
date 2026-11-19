@@ -1,6 +1,8 @@
 /** The built-in visual modifier families. Once/limited variants share their family icon. */
 export type ModifierIcon =
   | "explode"
+  | "explode-matching-batch"
+  | "explode-matching-batch-failure"
   | "compound"
   | "penetrate"
   | "re-roll"
@@ -15,6 +17,7 @@ export type ModifierIconPosition = "corner" | "below";
 
 const burst =
   "M16 1 19.37 7.87 26.61 5.39 24.13 12.63 31 16 24.13 19.37 26.61 26.61 19.37 24.13 16 31 12.63 24.13 5.39 26.61 7.87 19.37 1 16 7.87 12.63 5.39 5.39 12.63 7.87Z";
+const matchingBurst = `<path d="${burst}"/><circle cx="10" cy="16" r="1.8" fill="currentColor" stroke="none"/><circle cx="22" cy="16" r="1.8" fill="currentColor" stroke="none"/>`;
 const definitions: Record<
   ModifierIcon,
   { title: string; colour: string; body: string }
@@ -23,6 +26,16 @@ const definitions: Record<
     title: "Explosion triggered",
     colour: "#9b5d0a",
     body: `<path d="${burst}"/>`,
+  },
+  "explode-matching-batch": {
+    title: "Matching batch triggered an extra batch",
+    colour: "#9b5d0a",
+    body: matchingBurst,
+  },
+  "explode-matching-batch-failure": {
+    title: "Matching batch failed. Pool score reset to 0.",
+    colour: "#b34654",
+    body: `${matchingBurst}<path d="M11 23 21 9"/>`,
   },
   compound: { title: "Compounding explosion", colour: "#7546b2", body: "" },
   penetrate: {

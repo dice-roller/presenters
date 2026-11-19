@@ -115,6 +115,8 @@ const escape = (value: string | number) =>
   );
 const flagLabels: Record<string, string> = {
   explode: "!",
+  "explode-matching-batch": "!m",
+  "explode-matching-batch-failure": "!mf",
   compound: "!!",
   penetrate: "p",
   drop: "drop",
