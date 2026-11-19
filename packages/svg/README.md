@@ -86,6 +86,39 @@ These are SVG drawing units, not the containing element's pixel width. CSS can
 scale the output, but does not recalculate wrapping. A wide, unwrapped SVG can
 be placed inside a horizontally scrolling container to retain readable dice.
 
+## Comparisons and conditional rolls
+
+Expression comparisons display their evaluated operands using `=`, `≠`, `<`, `>`,
+`≤` or `≥`, followed by a small `true · 1` or `false · 0` outcome underneath.
+The outcome remains numeric, including when a comparison is used in arithmetic.
+`!=` and `<>` both display as `≠`; `data-operator` retains the original operator.
+
+Ternaries use an **IF → THEN/ELSE** flow. The IF card shows the evaluated check
+and its zero/non-zero truth value; the other card shows only the selected branch.
+Cards stack vertically when the configured width is too narrow. `noWrap: true`
+keeps the flow horizontal. Hover a card for its role and value; the complete
+conditional's tooltip also explains which branch was not evaluated.
+
+`$condition` displays its stored numeric value in a dashed outline with a small
+`$condition` label. It never renders the check's dice again. This also supports
+shorthand ternaries, nested bindings and dropped group members. Decision labels
+remain visible independently of dice labels and modifier labels.
+
+Wrappers expose `comparison-result` (`data-operator`, `data-truth`, `data-value`),
+`conditional-result` (`data-condition-value`, `data-selected-branch`, `data-value`,
+`data-layout`), and `condition-reference-result` (`data-value`). Cards use
+`conditional-part-result` with `data-part="condition"` or `selected-branch`.
+They participate in the same most-specific hover highlighting as pools and groups.
+
+Parsing these notations requires a core release containing the features. The
+currently published `6.0.0-beta.5` predates them; the demo uses saved results from
+the core's `next` branch. The presenter accepts these result shapes without
+rolling, parsing or evaluating them. Once the core is updated, normal usage is:
+
+```typescript
+new Roll("((d20)>=10) ? (2d8+$condition) : (d4)").present(new SvgPresenter());
+```
+
 ## Selecting dice
 
 Each rendered die has `data-*` attributes on its enclosing `<g>`, covering its

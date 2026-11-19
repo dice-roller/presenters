@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import DemoNav from "../DemoNav.vue";
 import { diceArtwork } from "./dice-artwork.js";
+import { decisionExamples } from "../../packages/svg/tests/fixtures/decision-examples.js";
 import { SvgPresenter } from "@dice-roller/svg-presenter";
 import {
   sampleResult,
@@ -80,6 +81,12 @@ const presenter = computed(
 );
 const singlePreview = computed(() => presenter.value.present(sampleRoll));
 const preview = computed(() => presenter.value.present(sampleResult));
+const decisionPreview = computed(() =>
+  presenter.value.present({
+    rolls: decisionExamples,
+    total: decisionExamples.reduce((sum, roll) => sum + roll.total, 0),
+  }),
+);
 
 const modifierLegend = [
   {
@@ -331,6 +338,20 @@ const modifierLegend = [
         <summary>Fixed result object</summary>
         <pre>{{ JSON.stringify(sampleResult, null, 2) }}</pre>
       </details>
+    </section>
+    <section class="presenter-preview" aria-labelledby="decisions-heading">
+      <h2 id="decisions-heading">Comparisons and conditional rolls</h2>
+      <p>
+        The condition and selected branch use stored results. The other branch
+        is not evaluated.
+      </p>
+      <div
+        class="preview-output"
+        :class="{ 'monochrome-modifiers': monochromeModifiers }"
+        tabindex="0"
+        aria-label="Scrollable comparison and conditional results"
+        v-html="decisionPreview"
+      />
     </section>
   </main>
 </template>
