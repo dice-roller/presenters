@@ -142,6 +142,34 @@ function markers(item: ScoredItem): string {
   return flags.join(" · ");
 }
 
+function calculatedSelections(owner: PoolResult | results.GroupResult) {
+  return (owner.modifierArguments ?? []).flatMap(
+    ({ modifierIndex, result }) => {
+      const modifier = owner.node.modifiers[modifierIndex];
+      if (
+        !modifier ||
+        (modifier.name !== "keep" && modifier.name !== "drop") ||
+        typeof modifier.qty === "number"
+      )
+        return [];
+
+      const expression = ast.nodeToNotation(modifier.qty);
+      const notation = `${modifier.name[0]}${modifier.end}${modifier.qty.type === "paren" ? expression : `(${expression})`}`;
+      const action = modifier.name === "keep" ? "Keep" : "Drop";
+      const end = modifier.end === "h" ? "highest" : "lowest";
+      return [
+        {
+          modifierIndex,
+          notation,
+          quantity: result.value,
+          caption: `${action} ${end} ${result.value}`,
+          detail: `${notation} → ${result.value}`,
+        },
+      ];
+    },
+  );
+}
+
 function tokens(
   result: SvgExpressionResult,
   excluded = false,
@@ -580,37 +608,54 @@ export function renderSvg(
           `<g class="math-group-result" data-math-group="${token.name ? "function" : "parentheses"}"${token.name ? ` data-function="${escape(token.name)}"` : ""}>${child.paint(x, y)}</g>`,
       };
     }
-    if (token.kind === "group") {
+    if (token.kind === "group" || token.kind === "pool") {
       const child = layout(token.children, available);
-      const group = token.result;
+      const owner = token.result;
       const notation = ast.nodeToNotation({
-        ...group.node,
+        ...owner.node,
         description: undefined,
       });
-      const counted = group.members.filter(
-        (member) => member.useInTotal,
-      ).length;
-      const details = `Roll group: ${notation}; ${group.members.length} members; ${counted} counted; total ${group.value}${token.excluded ? "; excluded by enclosing group" : ""}`;
+      const items = owner.type === "pool" ? owner.rolls : owner.members;
+      const counted = items.filter((item) => item.useInTotal).length;
+      const isPool = owner.type === "pool";
+      const kind = isPool ? "dice-pool" : "roll-group";
+      const scope = isPool ? "Dice pool" : "Roll group";
+      const noun = isPool
+        ? items.length === 1
+          ? "result"
+          : "results"
+        : "members";
+      const selections = calculatedSelections(owner);
+      const calculationDetails = selections
+        .map(({ detail }) => `; ${detail}`)
+        .join("");
+      const details = `${scope}: ${notation}; ${items.length} ${noun}; ${counted} counted; total ${owner.value}${token.excluded ? "; excluded by enclosing group" : ""}${calculationDetails}`;
+      const metadata = isPool
+        ? `data-pool="true" data-notation="${escape(notation)}" data-quantity="${owner.qty.value}" data-result-count="${items.length}"`
+        : `data-group="true" data-notation="${escape(notation)}" data-member-count="${items.length}"`;
+      let height = child.height;
+      const lineHeight = caption * 1.4;
+      const captions = (showModifierLabels ? selections : []).map(
+        (selection) => {
+          const lines = wrapDescription(selection.caption, child.width - 12);
+          const top = height + 6;
+          height = top + lines.length * lineHeight;
+          return { ...selection, lines, top };
+        },
+      );
       return {
         ...child,
-        paint: (x, y) =>
-          `<g class="roll-group-result" data-group="true" data-notation="${escape(notation)}" data-member-count="${group.members.length}" data-counted-count="${counted}" data-value="${group.value}"><title>${escape(details)}</title><rect class="roll-group-hit-area" x="${x}" y="${y}" width="${child.width}" height="${child.height}" fill="transparent" stroke="none" pointer-events="all"/>${hoverOutline(x, y, child.width, child.height)}${child.paint(x, y)}</g>`,
-      };
-    }
-    if (token.kind === "pool") {
-      const child = layout(token.children, available);
-      const pool = token.result;
-      const notation = ast.nodeToNotation({
-        ...pool.node,
-        description: undefined,
-      });
-      const counted = pool.rolls.filter((roll) => roll.useInTotal).length;
-      const details = `Dice pool: ${notation}; ${pool.rolls.length} ${pool.rolls.length === 1 ? "result" : "results"}; ${counted} counted; total ${pool.value}${token.excluded ? "; excluded by enclosing group" : ""}`;
-      return {
-        ...child,
-        paint: (x, y) =>
+        height,
+        paint: (x, y) => {
+          const annotations = captions
+            .map(
+              ({ modifierIndex, notation, quantity, detail, lines, top }) =>
+                `<text class="caption calculated-selection-label${token.excluded ? " excluded" : ""}" data-modifier-index="${modifierIndex}" data-notation="${escape(notation)}" data-quantity="${quantity}" text-anchor="middle" font-size="${caption}"><title>${escape(detail)}</title>${lines.map((line, i) => `<tspan x="${x + child.width / 2}" y="${y + top + caption + i * lineHeight}">${escape(line)}</tspan>`).join("")}</text>`,
+            )
+            .join("");
           // Keep the hit area behind children: dice and icons own their tooltips.
-          `<g class="dice-pool-result" data-pool="true" data-notation="${escape(notation)}" data-quantity="${pool.qty.value}" data-result-count="${pool.rolls.length}" data-counted-count="${counted}" data-value="${pool.value}"><title>${escape(details)}</title><rect class="dice-pool-hit-area" x="${x}" y="${y}" width="${child.width}" height="${child.height}" fill="transparent" stroke="none" pointer-events="all"/>${hoverOutline(x, y, child.width, child.height)}${child.paint(x, y)}</g>`,
+          return `<g class="${kind}-result" ${metadata} data-counted-count="${counted}" data-value="${owner.value}"><title>${escape(details)}</title><rect class="${kind}-hit-area" x="${x}" y="${y}" width="${child.width}" height="${height}" fill="transparent" stroke="none" pointer-events="all"/>${hoverOutline(x, y, child.width, height)}${child.paint(x, y)}${annotations}</g>`;
+        },
       };
     }
     if (token.kind === "member") {

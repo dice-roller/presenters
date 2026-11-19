@@ -41,6 +41,17 @@ export const rollExampleDefinitions: readonly RollExampleDefinition[] = [
   { id: "group-targets", notation: "{d6, d6}>=5f<=2", seed: 7 },
   { id: "keep-group", notation: "{2d6, 2d8}kh1", seed: 1 },
   { id: "drop-group", notation: "{2d6, 2d8}dl1", seed: 1 },
+  {
+    id: "calculated-keep-pool",
+    notation: "5d6kh($keep + 1)",
+    seed: 1,
+    data: { keep: 2 },
+  },
+  {
+    id: "calculated-drop-group",
+    notation: "{2d6, 2d8, 2d10}dl(d2)",
+    seed: 1,
+  },
   { id: "multi-pool", notation: "{d6 + d8, d10 + d4}kh1", seed: 1 },
   {
     id: "nested-maths",
