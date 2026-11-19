@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { ast, ExpressionResult } from "@dice-roller/rpg-dice-roller";
 import { SvgPresenter } from "../dist/index.js";
 import type { SvgExpressionResult } from "../dist/index.js";
-import { decisionExamples } from "./fixtures/decision-examples.js";
+import { decisionExamples } from "./fixtures/decision-layout-results.js";
 
 const number = (value: number): ExpressionResult => ({
   type: "number",
@@ -120,7 +120,7 @@ test("comparison operands retain parentheses and comparison arithmetic is groupe
   ]);
 });
 
-test("saved core comparisons keep dice, true/false outcomes and totals", () => {
+test("synthetic comparison layouts keep dice, true/false outcomes and totals", () => {
   for (const index of [0, 1, 6, 8]) {
     const roll = decisionExamples[index]!;
     const svg = presenter.present(roll);

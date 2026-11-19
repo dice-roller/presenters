@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SvgPresenter } from "../dist/index.js";
 import type { SvgExpressionResult } from "../dist/index.js";
-import { decisionExamples } from "./fixtures/decision-examples.js";
+import { decisionExamples } from "./fixtures/decision-layout-results.js";
 
 const presenter = new SvgPresenter({ noWrap: true, showNotation: false });
 const dice = (svg: string) => [
@@ -65,7 +65,7 @@ test("shorthand and explicit condition references do not repeat the condition di
   const svg = presenter.present(decisionExamples[4]!);
   assert.equal(dice(svg).length, 1);
   assert.match(svg, /class="condition-reference-result" data-value="5"/);
-  assert.match(svg, /\$condition: 5/);
+  assert.match(svg, /<title>\$condition: 5<\/title>/);
   assert.doesNotMatch(svg, /data-faces="8"/);
   const falseBranch = presenter.present(conditional(0, "false", reference(0)));
   assert.match(falseBranch, />IF · false<\/text>/);

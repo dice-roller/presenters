@@ -23,7 +23,11 @@ npm run dev
 
 Open the URL Vite prints. `/` lists the presenters; `/svg/` contains the artwork
 gallery and all existing result examples. Each presenter has its own demo page.
-The demo is for local development and has no deployment workflow.
+The demo is for local development and has no deployment workflow. Its result
+examples are real dice roller `Roll` instances created from notation and fixed
+RNG seeds, evaluated once and reused for appearance changes. Unsupported newer
+notations are listed with the installed core's error, not rendered from synthetic
+results. Static artwork/legend samples remain separate from roll examples.
 
 ```sh
 npm test              # each workspace's tests

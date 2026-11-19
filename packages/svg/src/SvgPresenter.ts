@@ -22,6 +22,11 @@ import type {
 
 type PoolResult = results.PoolResult;
 type ScoredItem = results.ScoredItem;
+/**
+ * Core results plus temporary input shapes for unreleased decision-layout tests.
+ * Demo/integration examples always use actual core Roll instances. Remove these
+ * extra variants in favour of core types when updating the dependency.
+ */
 export type SvgExpressionResult =
   | ExpressionResult
   | {

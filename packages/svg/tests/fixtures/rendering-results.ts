@@ -1,3 +1,5 @@
+// Synthetic rendering fixtures for isolated layout and escaping tests only.
+// Demo output and integration coverage use real rolls from demo/svg/roll-examples.ts.
 import type {
   ExpressionResult,
   ast,

@@ -1,6 +1,6 @@
-// Matches evaluated snapshots from rpg-dice-roller next at
-// bf5497c92098b6b035c978e2e54c89ab342babc0. These fixed results do not roll dice.
-// The published beta predates these types, so compatibility casts stay here.
+// Synthetic fixtures for future decision-layout unit tests only.
+// They are not demo output and do not establish compatibility with the installed core.
+// Replace these casts with core types when the dependency gains these result variants.
 import type { ast } from "@dice-roller/rpg-dice-roller";
 import type { SvgExpressionResult, SvgRoll } from "../../src/index.js";
 
