@@ -7,8 +7,7 @@ import {
   createRollExample,
   createRollExamples,
   createExampleHistory,
-  createDeferredExamples,
-  deferredExampleDefinitions,
+  decisionExampleDefinitions,
   rollExampleDefinitions,
   singleRollDefinition,
 } from "../../../demo/svg/roll-examples.js";
@@ -21,12 +20,18 @@ function* visibleResults(
 ): Generator<{ result: ExpressionResult; excluded: boolean }> {
   yield { result, excluded };
   switch (result.type) {
+    case "reference":
     case "number":
     case "pool":
       return;
+    case "comparison":
     case "binary":
       yield* visibleResults(result.left, excluded);
       yield* visibleResults(result.right, excluded);
+      return;
+    case "conditional":
+      yield* visibleResults(result.condition, excluded);
+      yield* visibleResults(result.selectedResult, excluded);
       return;
     case "unary":
       yield* visibleResults(result.operand, excluded);
@@ -109,7 +114,11 @@ function assertMatchesCore(svg: string, roll: Roll<unknown>, totals = true) {
   else assert.doesNotMatch(svg, /class="total"/);
 }
 
-for (const definition of [...rollExampleDefinitions, singleRollDefinition]) {
+for (const definition of [
+  ...rollExampleDefinitions,
+  ...decisionExampleDefinitions,
+  singleRollDefinition,
+]) {
   test(`real-core integration: ${definition.id}`, () => {
     const example = createRollExample(definition);
     assert.ok(example.roll instanceof Roll);
@@ -202,26 +211,6 @@ test("fresh examples reproduce their seeds and real histories retain ordering an
     examples.map((item) => item.randomDrawCount()),
     draws,
   );
-});
-
-test("deferred notation is either a genuine core roll or an explicit core rejection", () => {
-  const examples = createDeferredExamples();
-  assert.equal(examples.length, deferredExampleDefinitions.length);
-  for (const item of examples) {
-    if (item.status === "available") {
-      assert.ok(item.example.roll instanceof Roll);
-      // Do not catch presenter errors here: a future core schema change must fail CI.
-      item.example.roll.present(new SvgPresenter());
-    } else {
-      assert.ok(item.reason.length > 0);
-      assert.throws(
-        () => createRollExample(item.definition),
-        (error) =>
-          error instanceof errors.DiceRollerError &&
-          error.message === item.reason,
-      );
-    }
-  }
 });
 
 test("invalid supported examples fail instead of silently substituting a fixture", () => {

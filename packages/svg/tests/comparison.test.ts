@@ -17,7 +17,7 @@ const comparison = (
   right = number(3),
 ): SvgExpressionResult => ({
   type: "comparison",
-  node: { op },
+  node: { type: "comparison", op, left: left.node, right: right.node },
   value,
   left,
   right,
@@ -73,7 +73,7 @@ test("all comparison operators show their operands, source operator and numeric 
 
 test("comparison operands retain parentheses and comparison arithmetic is grouped", () => {
   const inner = comparison("<", 1, number(1), number(2));
-  const operand = inner as ExpressionResult;
+  const operand = inner;
   const sum: ExpressionResult = {
     type: "binary",
     node: {
@@ -120,7 +120,7 @@ test("comparison operands retain parentheses and comparison arithmetic is groupe
   ]);
 });
 
-test("synthetic comparison layouts keep dice, true/false outcomes and totals", () => {
+test("evaluated comparison layouts keep dice, true/false outcomes and totals", () => {
   for (const index of [0, 1, 6, 8]) {
     const roll = decisionExamples[index]!;
     const svg = presenter.present(roll);

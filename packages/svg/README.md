@@ -110,8 +110,8 @@ Cards stack vertically when the configured width is too narrow. `noWrap: true`
 keeps the flow horizontal. Hover a card for its role and value; the complete
 conditional's tooltip also explains which branch was not evaluated.
 
-`$condition` displays its stored numeric value in a dashed outline with a small
-`$condition` label. It never renders the check's dice again. This also supports
+`$$condition` displays its stored numeric value in a dashed outline with a small
+`$$condition` label. It never renders the check's dice again. This also supports
 shorthand ternaries, nested bindings and dropped group members. Decision labels
 remain visible independently of dice labels and modifier labels.
 
@@ -121,16 +121,13 @@ Wrappers expose `comparison-result` (`data-operator`, `data-truth`, `data-value`
 `conditional-part-result` with `data-part="condition"` or `selected-branch`.
 They participate in the same most-specific hover highlighting as pools and groups.
 
-Parsing these notations requires a core release containing the features. The
-currently installed `6.0.0-beta.5` predates them. The demo attempts these notations
-with the real core and lists unsupported examples with the core's error instead
-of rendering substitute snapshots. The future decision layout still has isolated
-unit tests; it is not an end-to-end integration test until the core is upgraded.
-After upgrading, successful examples use the same real-roll integration path,
-and presenter errors are allowed to fail the tests. Normal usage will be:
+Comparisons, ternaries and references require dice roller `6.0.0-beta.6` or
+later. The demo and integration tests evaluate these examples through the core.
+Caller data references such as `$character.bonus` use the same value marker
+with their own notation.
 
 ```typescript
-new Roll("((d20)>=10) ? (2d8+$condition) : (d4)").present(new SvgPresenter());
+new Roll("((d20)>=10) ? (2d8+$$condition) : (d4)").present(new SvgPresenter());
 ```
 
 ## Selecting dice

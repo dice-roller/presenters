@@ -22,36 +22,8 @@ import type {
 
 type PoolResult = results.PoolResult;
 type ScoredItem = results.ScoredItem;
-/**
- * Core results plus temporary input shapes for unreleased decision-layout tests.
- * Demo/integration examples always use actual core Roll instances. Remove these
- * extra variants in favour of core types when updating the dependency.
- */
-export type SvgExpressionResult =
-  | ExpressionResult
-  | {
-      readonly type: "comparison";
-      readonly node: { readonly op: ast.CompareOperator };
-      readonly value: number;
-      readonly left: SvgExpressionResult;
-      readonly right: SvgExpressionResult;
-    }
-  | {
-      readonly type: "conditional";
-      readonly node: unknown;
-      readonly value: number;
-      readonly condition: SvgExpressionResult;
-      readonly selectedBranch: "true" | "false";
-      readonly selectedResult: SvgExpressionResult;
-    }
-  | {
-      readonly type: "condition-reference";
-      readonly node: unknown;
-      readonly value: number;
-    };
-export type SvgRoll = Pick<RollData, "notation" | "total"> & {
-  readonly result: SvgExpressionResult;
-};
+export type SvgExpressionResult = ExpressionResult;
+export type SvgRoll = Pick<RollData, "notation" | "total" | "result">;
 export type SvgHistory = Pick<HistoryData, "total"> & {
   readonly rolls: readonly SvgRoll[];
 };
@@ -97,7 +69,7 @@ type Token =
       value: number;
       excluded: boolean;
     }
-  | { kind: "reference"; value: number; excluded: boolean }
+  | { kind: "reference"; notation: string; value: number; excluded: boolean }
   | { kind: "math-group"; children: Token[]; name?: string }
   | {
       kind: "group";
@@ -245,8 +217,15 @@ function expressionTokens(
   switch (result.type) {
     case "number":
       return [text(String(result.value))];
-    case "condition-reference":
-      return [{ kind: "reference", value: result.value, excluded }];
+    case "reference":
+      return [
+        {
+          kind: "reference",
+          notation: ast.nodeToNotation(result.node),
+          value: result.value,
+          excluded,
+        },
+      ];
     case "comparison": {
       const operator =
         {
@@ -576,14 +555,14 @@ export function renderSvg(
     if (token.kind === "reference") {
       const width = Math.max(
         String(token.value).length * font * 0.62 + 14,
-        proportionalTextWidth("$condition", caption) + 12,
+        proportionalTextWidth(token.notation, caption) + 12,
       );
       return {
         width,
         height: font + caption * 1.5 + 12,
         axis: font / 2 + 3,
         paint: (x, y) =>
-          `<g class="condition-reference-result${token.excluded ? " excluded" : ""}" data-value="${token.value}"><title>${escape(`$condition: ${token.value}`)}</title><rect class="condition-reference-outline" x="${x + 2}" y="${y}" width="${width - 4}" height="${font + 6}" rx="5"/>${label(token.value, x + width / 2, y + font / 2 + 3, `class="math" text-anchor="middle" dominant-baseline="central" font-size="${font}"`)}${label("$condition", x + width / 2, y + font + caption + 8, `class="decision-label" text-anchor="middle" font-size="${caption}"`)}</g>`,
+          `<g class="condition-reference-result${token.excluded ? " excluded" : ""}" data-value="${token.value}"><title>${escape(`${token.notation}: ${token.value}`)}</title><rect class="condition-reference-outline" x="${x + 2}" y="${y}" width="${width - 4}" height="${font + 6}" rx="5"/>${label(token.value, x + width / 2, y + font / 2 + 3, `class="math" text-anchor="middle" dominant-baseline="central" font-size="${font}"`)}${label(token.notation, x + width / 2, y + font + caption + 8, `class="decision-label" text-anchor="middle" font-size="${caption}"`)}</g>`,
       };
     }
     if (token.kind === "math-group") {

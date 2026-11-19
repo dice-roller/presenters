@@ -6,7 +6,7 @@ import {
   createRollExample,
   createRollExamples,
   createExampleHistory,
-  createDeferredExamples,
+  decisionExampleDefinitions,
   singleRollDefinition,
 } from "./roll-examples.js";
 import { SvgPresenter } from "@dice-roller/svg-presenter";
@@ -85,14 +85,9 @@ const presenter = computed(
 const examples = createRollExamples();
 const singleExample = createRollExample(singleRollDefinition);
 const history = createExampleHistory(examples);
-const deferred = createDeferredExamples();
-const availableDecisions = deferred.flatMap((item) =>
-  item.status === "available" ? [item.example] : [],
+const decisionHistory = createExampleHistory(
+  decisionExampleDefinitions.map(createRollExample),
 );
-const unavailableDecisions = deferred.filter(
-  (item) => item.status === "unavailable",
-);
-const decisionHistory = createExampleHistory(availableDecisions);
 const singlePreview = computed(() =>
   singleExample.roll.present(presenter.value),
 );
@@ -360,33 +355,14 @@ const modifierLegend = [
       </details>
     </section>
     <section class="presenter-preview" aria-labelledby="decisions-heading">
-      <h2 id="decisions-heading">Additional notation support</h2>
-      <p>
-        These examples are also evaluated by the installed dice roller.
-        Unsupported notations are reported below; no substitute results are
-        generated.
-      </p>
+      <h2 id="decisions-heading">Comparisons and conditional rolls</h2>
       <div
         class="preview-output"
         :class="{ 'monochrome-modifiers': monochromeModifiers }"
         tabindex="0"
         aria-label="Scrollable comparison and conditional results"
-        v-if="availableDecisions.length"
         v-html="decisionPreview"
       />
-      <details v-if="unavailableDecisions.length">
-        <summary>
-          Not supported by the installed dice roller ({{
-            unavailableDecisions.length
-          }})
-        </summary>
-        <ul>
-          <li v-for="entry in unavailableDecisions" :key="entry.definition.id">
-            <code>{{ entry.definition.notation }}</code>
-            <p>{{ entry.reason }}</p>
-          </li>
-        </ul>
-      </details>
     </section>
   </main>
 </template>

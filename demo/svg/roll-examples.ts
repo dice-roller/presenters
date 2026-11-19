@@ -89,24 +89,23 @@ export function createExampleHistory(
   return history;
 }
 
-/** Upgrade candidates are probed with the real core, never replaced by snapshots. */
-export const deferredExampleDefinitions: readonly RollExampleDefinition[] = [
+export const decisionExampleDefinitions: readonly RollExampleDefinition[] = [
   { id: "comparison-true", notation: "(2d6+4)>10", seed: 1 },
-  { id: "comparison-false", notation: "(2d6+4)>10", seed: 2 },
+  { id: "comparison-false", notation: "(2d6+4)>10", seed: 5 },
   {
     id: "conditional-true",
-    notation: "((d20)>=10) ? (2d8+$condition) : (d4)",
+    notation: "((d20)>=10) ? (2d8+$$condition) : (d4)",
     seed: 1,
   },
   {
     id: "conditional-false",
-    notation: "((d20)>=10) ? (2d8+$condition) : (d4)",
+    notation: "((d20)>=10) ? (2d8+$$condition) : (d4)",
     seed: 4,
   },
   { id: "conditional-shorthand", notation: "(d6) ?: (d8)", seed: 1 },
   {
     id: "conditional-nested",
-    notation: "((d20)>=10) ? (((d6)>3) ? ($condition+2) : (d4)) : (0)",
+    notation: "((d20)>=10) ? (((d6)>3) ? ($$condition+2) : (d4)) : (0)",
     seed: 1,
   },
   { id: "comparison-arithmetic", notation: "((2d6)>(d8+2))*5", seed: 1 },
@@ -120,25 +119,4 @@ export const deferredExampleDefinitions: readonly RollExampleDefinition[] = [
     notation: "max(((d6)>3), ((0) ? (d20) : (d8)))",
     seed: 1,
   },
-  { id: "group-criticals", notation: "{d6, d6}>=5f<=2cs=6cf=1", seed: 7 },
 ];
-export type DeferredExample =
-  | { readonly status: "available"; readonly example: RollExample }
-  | {
-      readonly status: "unavailable";
-      readonly definition: RollExampleDefinition;
-      readonly reason: string;
-    };
-
-export function createDeferredExamples(): readonly DeferredExample[] {
-  return deferredExampleDefinitions.map((definition) => {
-    try {
-      return { status: "available", example: createRollExample(definition) };
-    } catch (error) {
-      // Only errors raised by the core's parse/evaluation boundary are reported.
-      // Presentation runs outside this catch, so integration failures stay visible.
-      if (!(error instanceof errors.DiceRollerError)) throw error;
-      return { status: "unavailable", definition, reason: error.message };
-    }
-  });
-}

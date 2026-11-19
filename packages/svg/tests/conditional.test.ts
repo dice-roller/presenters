@@ -1,36 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SvgPresenter } from "../dist/index.js";
-import type { SvgExpressionResult } from "../dist/index.js";
+import { Roll, RollHistory } from "@dice-roller/rpg-dice-roller";
 import { decisionExamples } from "./fixtures/decision-layout-results.js";
 
 const presenter = new SvgPresenter({ noWrap: true, showNotation: false });
 const dice = (svg: string) => [
   ...svg.matchAll(/data-die-type="[^"]+"[^>]*data-excluded="(true|false)"/g),
 ];
-const number = (value: number): SvgExpressionResult => ({
-  type: "number",
-  node: { type: "number", value },
-  value,
-});
-const reference = (value: number): SvgExpressionResult => ({
-  type: "condition-reference",
-  node: { type: "condition-reference" },
-  value,
-});
-const conditional = (
-  value: number,
-  selectedBranch: "true" | "false",
-  selectedResult: SvgExpressionResult,
-): SvgExpressionResult => ({
-  type: "conditional",
-  node: {},
-  condition: number(value),
-  selectedBranch,
-  selectedResult,
-  value: selectedResult.value,
-});
-
 test("ternaries show an IF card leading to only the chosen THEN or ELSE branch", () => {
   for (const [index, branch, count, heading] of [
     [2, "true", 3, "THEN"],
@@ -52,9 +29,10 @@ test("ternaries show an IF card leading to only the chosen THEN or ELSE branch",
 });
 
 test("conditional results work directly, in rolls and histories", () => {
-  const result = conditional(1, "true", reference(1));
-  const roll = { notation: "conditional", total: 1, result };
-  for (const target of [result, roll, { rolls: [roll], total: 1 }]) {
+  const roll = new Roll("(1) ? ($$condition) : (0)");
+  const history = new RollHistory();
+  history.add(roll);
+  for (const target of [roll.result, roll, history]) {
     const svg = presenter.present(target);
     assert.match(svg, /data-selected-branch="true"/);
     assert.match(svg, /class="condition-reference-result" data-value="1"/);
@@ -64,16 +42,16 @@ test("conditional results work directly, in rolls and histories", () => {
 test("shorthand and explicit condition references do not repeat the condition dice", () => {
   const svg = presenter.present(decisionExamples[4]!);
   assert.equal(dice(svg).length, 1);
-  assert.match(svg, /class="condition-reference-result" data-value="5"/);
-  assert.match(svg, /<title>\$condition: 5<\/title>/);
+  assert.match(svg, /class="condition-reference-result" data-value="4"/);
+  assert.match(svg, /<title>\$\$condition: 4<\/title>/);
   assert.doesNotMatch(svg, /data-faces="8"/);
-  const falseBranch = presenter.present(conditional(0, "false", reference(0)));
+  const falseBranch = presenter.present(new Roll("(0) ? (1) : ($$condition)"));
   assert.match(falseBranch, />IF · false<\/text>/);
   assert.match(falseBranch, /data-value="0"/);
 });
 
 test("nested conditions display their own resolved references and support arithmetic", () => {
-  const nested = conditional(2, "true", conditional(7, "true", reference(7)));
+  const nested = new Roll("(2) ? ((7) ? ($$condition) : (0)) : (0)");
   const svg = presenter.present(nested);
   assert.equal((svg.match(/class="conditional-result"/g) ?? []).length, 2);
   assert.match(svg, /class="condition-reference-result" data-value="7"/);
@@ -86,11 +64,11 @@ test("nested conditions display their own resolved references and support arithm
 });
 
 test("negative conditions are truthy and zero conditions are false", () => {
-  for (const [value, branch, label] of [
-    [-2, "true", "true"],
-    [0, "false", "false"],
+  for (const [value, label] of [
+    [-2, "true"],
+    [0, "false"],
   ] as const) {
-    const svg = presenter.present(conditional(value, branch, number(10)));
+    const svg = presenter.present(new Roll(`(${value}) ? (10) : (10)`));
     assert.match(svg, new RegExp(`>IF · ${label}</text>`));
     assert.ok(svg.includes(`data-condition-value="${value}"`));
   }
@@ -104,7 +82,7 @@ test("dropped group members exclude dice in the condition and chosen branch", ()
     renderedDice.map((die) => die[1]),
     ["true", "true", "false"],
   );
-  assert.match(svg, /data-selected-branch="false"[^>]*data-excluded="true"/);
+  assert.match(svg, /data-selected-branch="true"[^>]*data-excluded="true"/);
 });
 
 test("narrow ternaries stack cards while noWrap retains the horizontal flow", () => {
@@ -136,7 +114,11 @@ test("presentation never mutates snapshots, evaluates skipped branches or remove
       for (const child of Object.values(value)) freeze(child);
     }
   };
-  const target = structuredClone(decisionExamples[2]!);
+  const target = structuredClone({
+    notation: decisionExamples[2]!.notation,
+    total: decisionExamples[2]!.total,
+    result: decisionExamples[2]!.result,
+  });
   freeze(target);
   const svg = new SvgPresenter({
     showValues: false,
@@ -152,4 +134,14 @@ test("presentation never mutates snapshots, evaluates skipped branches or remove
   assert.match(svg, />true · 1<\/text>/);
   assert.doesNotMatch(svg, /class="total"|class="notation"/);
   assert.equal(JSON.stringify(decisionExamples), before);
+});
+
+test("caller data references retain their notation and resolved value", () => {
+  const roll = new Roll("$character.bonus + 1", {
+    data: { character: { bonus: 4 } },
+  });
+  const svg = roll.present(presenter);
+  assert.match(svg, /<title>\$character\.bonus: 4<\/title>/);
+  assert.match(svg, />\$character\.bonus<\/text>/);
+  assert.match(svg, />Total: 5<\/text>/);
 });
