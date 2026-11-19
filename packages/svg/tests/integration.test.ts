@@ -59,6 +59,78 @@ function attribute(tag: string, name: string): string {
   assert.ok(match, `Missing data-${name}: ${tag}`);
   return match[1]!;
 }
+
+test("calculated keep and drop captions use the counts recorded by the core", () => {
+  for (const [id, scope, caption, notation, quantity, counted] of [
+    [
+      "calculated-keep-pool",
+      "dice-pool",
+      "Keep highest 3",
+      "kh($keep+1)",
+      3,
+      3,
+    ],
+    ["calculated-drop-group", "roll-group", "Drop lowest 2", "dl(d2)", 2, 1],
+  ] as const) {
+    const definition = rollExampleDefinitions.find(
+      (example) => example.id === id,
+    )!;
+    const { roll, randomDrawCount } = createRollExample(definition);
+    const draws = randomDrawCount();
+    const svg = roll.present(new SvgPresenter());
+    const owner = svg.match(
+      new RegExp(`<g class="${scope}-result"[^>]*><title>([^<]*)</title>`),
+    );
+    assert.ok(owner);
+    assert.equal(attribute(owner[0], "counted-count"), String(counted));
+    assert.ok(owner[1]?.includes(`${notation} → ${quantity}`));
+    const labels = [
+      ...svg.matchAll(
+        /<text class="caption calculated-selection-label"[^>]*>(.*?)<\/text>/g,
+      ),
+    ];
+    assert.equal(labels.length, 1);
+    assert.equal(attribute(labels[0]![0], "modifier-index"), "0");
+    assert.equal(attribute(labels[0]![0], "notation"), notation);
+    assert.equal(attribute(labels[0]![0], "quantity"), String(quantity));
+    assert.ok(labels[0]![1]?.includes(`>${caption}</tspan>`));
+    const hidden = roll.present(
+      new SvgPresenter({ showModifierLabels: false }),
+    );
+    assert.doesNotMatch(hidden, /calculated-selection-label/);
+    assert.ok(hidden.includes(`${notation} → ${quantity}</title>`));
+    assert.equal(randomDrawCount(), draws);
+  }
+});
+
+test("calculated counts preserve execution order, zero, and counts above the pool size", () => {
+  const { roll } = createRollExample({
+    id: "multiple-calculated-counts",
+    notation: "4d6dh(0)kl(10)",
+    seed: 1,
+  });
+  const svg = roll.present(new SvgPresenter());
+  const labels = [
+    ...svg.matchAll(/<text class="caption calculated-selection-label"[^>]*>/g),
+  ];
+  assert.deepEqual(
+    labels.map(([tag]) => [
+      attribute(tag, "modifier-index"),
+      attribute(tag, "notation"),
+      attribute(tag, "quantity"),
+    ]),
+    [
+      ["1", "kl(10)", "10"],
+      ["0", "dh(0)", "0"],
+    ],
+  );
+  assert.match(svg, /data-result-count="4" data-counted-count="4"/);
+  assert.doesNotMatch(
+    new Roll("4d6kh2").present(new SvgPresenter()),
+    /calculated-selection-label/,
+  );
+});
+
 function assertMatchesCore(svg: string, roll: Roll<unknown>, totals = true) {
   const actual = [...visibleResults(roll.result)];
   const expectedPools = actual.filter(

@@ -275,13 +275,13 @@ These effects use CSS `:has()` and require an interactive SVG.
 These appearance options default to `true`. Set any to `false` to hide that
 part of the output; hidden labels do not reserve their usual layout space.
 
-| Option               | Controls                                              |
-| -------------------- | ----------------------------------------------------- |
-| `showDiceLabels`     | Die notation below each icon                          |
-| `showVariableLabels` | Names below variable and system reference values      |
-| `showModifierLabels` | Modifier labels below dice and group modifier markers |
-| `showNotation`       | The supplied notation above each roll                 |
-| `showTotals`         | Individual roll totals and the history total          |
+| Option               | Controls                                                    |
+| -------------------- | ----------------------------------------------------------- |
+| `showDiceLabels`     | Die notation below each icon                                |
+| `showVariableLabels` | Names below variable and system reference values            |
+| `showModifierLabels` | Modifier labels below dice, group members, pools and groups |
+| `showNotation`       | The supplied notation above each roll                       |
+| `showTotals`         | Individual roll totals and the history total                |
 
 ```typescript
 const presenter = new SvgPresenter({
@@ -322,6 +322,18 @@ A uniqueness icon means a duplicate was rerolled, not that uniqueness is guarant
 Group modifier labels are smaller captions centred beneath the whole member and wrap
 within its width. Group member flags are displayed on that member, without repeating them on every
 nested die. Icons wrap into additional rows when needed.
+
+Calculated keep and drop quantities appear as captions centred beneath the pool
+or group they apply to. For example, `5d6kh($keep + 1)` with `$keep` set to 2 shows
+**Keep highest 3**. Hover the caption or the enclosing pool or group to see
+`kh($keep+1) → 3`. These values come from the evaluated result, including when
+the quantity expression rolls its own dice. The pool or group tooltip still
+shows the calculation if `showModifierLabels` is false.
+
+Each `.calculated-selection-label` has `data-modifier-index` (its index in the
+owning node's modifier array), `data-notation` and `data-quantity`. The evaluated
+quantity can exceed the number of items available. The existing counted and
+dropped markers show the actual outcome.
 
 Corner placement cuts transparent circular gaps out of the artwork behind each
 symbol. It does not paint a background colour. Below placement generates no
