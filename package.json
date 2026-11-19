@@ -26,7 +26,7 @@
     "pack:check": "npm pack --workspaces --dry-run"
   },
   "devDependencies": {
-    "@dice-roller/rpg-dice-roller": "^6.0.0-beta.5",
+    "@dice-roller/rpg-dice-roller": "^6.0.0-beta.7",
     "@types/node": "^22.0.0",
     "@vitejs/plugin-vue": "^6.0.10",
     "prettier": "^3.0.0",

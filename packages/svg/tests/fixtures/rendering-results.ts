@@ -1,3 +1,5 @@
+// Synthetic rendering fixtures for isolated layout and escaping tests only.
+// Demo output and integration coverage use real rolls from demo/svg/roll-examples.ts.
 import type {
   ExpressionResult,
   ast,
@@ -392,7 +394,9 @@ function selectionGroup(name: "keep" | "drop"): ExpressionResult {
       type: "group",
       expressions: members.map((item) => item.result.node),
       modifiers: [
-        { type: "modifier", name, end: name === "keep" ? "h" : "l", qty: 1 },
+        name === "keep"
+          ? { type: "modifier", name: "keep", end: "h", qty: 1 }
+          : { type: "modifier", name: "drop", end: "l", qty: 1 },
       ],
     },
   };

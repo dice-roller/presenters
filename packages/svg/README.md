@@ -6,7 +6,7 @@ CSS-stylable SVG output for [RPG Dice Roller](https://github.com/dice-roller/rpg
 npm install @dice-roller/svg-presenter @dice-roller/rpg-dice-roller@next
 ```
 
-This package is not yet published. Run the local playground from the repository root with `npm run dev`, then open `/svg/`.
+Run the local playground from the repository root with `npm run dev`, then open `/svg/`.
 
 ## SVG presenter
 
@@ -14,31 +14,136 @@ This package is not yet published. Run the local playground from the repository 
 import { Roll } from "@dice-roller/rpg-dice-roller";
 import { SvgPresenter } from "@dice-roller/svg-presenter";
 
-// Supply SVG template strings, keyed by shape (d2, d4, d6, etc.).
-// Include a generic template for unsupported face counts.
-const presenter = new SvgPresenter(artwork, { size: 140 });
+// Standard dice artwork is included automatically.
+const presenter = new SvgPresenter();
 const svg = new Roll("2d6 + 3").present(presenter);
 ```
 
 The presenter supports rolls, histories and expression results. It uses the core
 library's types and reads existing results without evaluating or rolling again.
 The SVG renderer and text-slot helper live in `packages/svg/src/`. The artwork
-gallery lives in `demo/svg/`, and shared fixed-result fixtures live in
-`packages/svg/tests/fixtures/`.
+gallery lives in `demo/svg/`. Demo result examples are real `Roll` instances
+created by `demo/svg/roll-examples.ts`, using an independent seeded engine per
+notation. Appearance changes reuse those rolls without evaluating again.
+
+`tests/integration.test.ts` runs every supported example through the installed
+core, then checks rendered dice values, flags, exclusions, quantities, counts and
+totals against the actual result tree. An exhaustive walk of the installed core's
+result union makes new/renamed result types a TypeScript error until integration
+coverage is updated. The suite also checks real histories, repeatable
+seeds, export/import and absence of extra random draws during presentation.
+
+Handwritten fixtures under `tests/fixtures/` are isolated layout/escaping tests;
+they are not used by the demo or presented as integration coverage.
 
 The dice roller is a peer dependency requiring v6 (including prereleases), and a
 development dependency using the published v6 beta. Vue and Vite are only used
 by the local demo and are not package dependencies.
 
-Import the blank dice artwork through the package's SVG exports, for example
-`@dice-roller/svg-presenter/icons/d20.svg`. With Vite, append `?raw` to import it
-as a template string. Supply all required artwork, including `generic`, to the
-presenter as shown above.
+The presenter bundles the default dice artwork as SVG strings. It works in Node
+and browsers without filesystem access, fetch requests or SVG import loaders.
+
+Pass appearance settings in a single options object. To customise artwork, add
+only the shapes you want to override under `artwork`. Other shapes, including the
+generic fallback, retain their bundled defaults. `SvgPresenterOptions` is exported
+for reusable option objects.
+
+```typescript
+const presenter = new SvgPresenter({ size: 100 });
+
+// customD20Svg is your trusted SVG template string.
+const customised = new SvgPresenter({
+  size: 100,
+  artwork: { d20: customD20Svg },
+});
+```
+
+Artwork keys are `d2`, `d4`, `d6`, `d8`, `d10`, `d12`, `d20` and `generic`.
+Percentile dice use `d10`, and Fudge dice use `d6`. Add a key such as `d13` to
+provide dedicated artwork for another face count, or override `generic` to
+change the fallback. Custom templates must include an empty
+`<text data-slot="value">` element as described in the [artwork guide](assets/dice/README.md).
+
+The frozen `defaultArtwork` map is also exported for galleries and direct
+`renderSvg` calls. Raw SVG assets remain available through exports such as
+`@dice-roller/svg-presenter/icons/d20.svg`; Vite users can append `?raw` when
+importing a custom template string.
 
 Pool and group descriptions are displayed once alongside their results. Inline
 descriptions follow the pool or group; block descriptions sit above it and wrap
 as needed. Set `showDescriptions: false` to hide them. The local demo includes
 nested examples and a matching appearance control.
+
+## Width and wrapping
+
+`width` sets the SVG drawing width, including 24 units of padding on each side.
+It defaults to `1040`. Results and notation wrap to fit that width. The value
+must be finite and greater than `48`.
+
+```typescript
+const presenter = new SvgPresenter({ width: 800 });
+```
+
+Use `noWrap: true` to keep each roll expression on a single line. The SVG then
+sizes itself to its contents; `width` does not constrain it. Histories still
+place each roll separately, and labels, descriptions and modifier flags retain
+their own layout around the dice.
+
+```typescript
+const presenter = new SvgPresenter({ noWrap: true });
+```
+
+These are SVG drawing units, not the containing element's pixel width. CSS can
+scale the output, but does not recalculate wrapping. A wide, unwrapped SVG can
+be placed inside a horizontally scrolling container to retain readable dice.
+
+## Comparisons and conditional rolls
+
+Expression comparisons display their evaluated operands using `=`, `≠`, `<`, `>`,
+`≤` or `≥`, followed by a small `true · 1` or `false · 0` outcome underneath.
+The outcome remains numeric, including when a comparison is used in arithmetic.
+`!=` and `<>` both display as `≠`; `data-operator` retains the original operator.
+
+Ternaries use an **IF → THEN/ELSE** flow. The IF card shows the evaluated check
+and its zero/non-zero truth value; the other card shows only the selected branch.
+Cards stack vertically when the configured width is too narrow. `noWrap: true`
+keeps the flow horizontal. Hover a card for its role and value; the complete
+conditional's tooltip also explains which branch was not evaluated.
+
+`$$condition` displays its stored numeric value in a dashed outline with a small
+`$$condition` label. It never renders the check's dice again. This also supports
+shorthand ternaries, nested bindings and dropped group members. Decision labels
+remain visible independently of dice labels and modifier labels.
+
+Wrappers expose `comparison-result` (`data-operator`, `data-truth`, `data-value`),
+`conditional-result` (`data-condition-value`, `data-selected-branch`, `data-value`,
+`data-layout`), and `condition-reference-result` (`data-value`). Cards use
+`conditional-part-result` with `data-part="condition"` or `selected-branch`.
+They participate in the same most-specific hover highlighting as pools and groups.
+
+Comparisons, ternaries and references require dice roller `6.0.0-beta.6` or
+later. The demo and integration tests evaluate these examples through the core.
+Caller data references such as `$character.bonus` use the same value marker
+with their own notation.
+
+```typescript
+new Roll("((d20)>=10) ? (2d8+$$condition) : (d4)").present(new SvgPresenter());
+```
+
+## Caller data variables
+
+Pass your variables in the dice roller's `data` option. Single-dollar references
+such as `$strength` and `$attr.resistance.fire` show their resolved numeric value
+in a dashed outline, with the original path below it. Set
+`showVariableLabels: false` to hide the path beneath the value. This also hides
+the label beneath `$$condition` values. Hovering still shows the name and value.
+
+```typescript
+const roll = new Roll("2d6 + $strength + $attr.resistance.fire", {
+  data: { strength: 3, attr: { resistance: { fire: -1.25 } } },
+});
+const svg = roll.present(new SvgPresenter());
+```
 
 ## Selecting dice
 
@@ -170,15 +275,16 @@ These effects use CSS `:has()` and require an interactive SVG.
 These appearance options default to `true`. Set any to `false` to hide that
 part of the output; hidden labels do not reserve their usual layout space.
 
-| Option               | Controls                                              |
-| -------------------- | ----------------------------------------------------- |
-| `showDiceLabels`     | Die notation below each icon                          |
-| `showModifierLabels` | Modifier labels below dice and group modifier markers |
-| `showNotation`       | The supplied notation above each roll                 |
-| `showTotals`         | Individual roll totals and the history total          |
+| Option               | Controls                                                    |
+| -------------------- | ----------------------------------------------------------- |
+| `showDiceLabels`     | Die notation below each icon                                |
+| `showVariableLabels` | Names below variable and system reference values            |
+| `showModifierLabels` | Modifier labels below dice, group members, pools and groups |
+| `showNotation`       | The supplied notation above each roll                       |
+| `showTotals`         | Individual roll totals and the history total                |
 
 ```typescript
-const presenter = new SvgPresenter(artwork, {
+const presenter = new SvgPresenter({
   showDiceLabels: false,
   showModifierLabels: false,
   showNotation: false,
@@ -199,7 +305,7 @@ and penetrate outcomes show two separate symbols. Dropped results remain faded
 and crossed out. Keep and sort do not need additional icons.
 
 ```typescript
-const presenter = new SvgPresenter(artwork, {
+const presenter = new SvgPresenter({
   showModifierIcons: true,
   modifierIconPosition: "below", // "corner" (default) or "below"
 });
@@ -207,11 +313,27 @@ const presenter = new SvgPresenter(artwork, {
 
 `showModifierIcons` is independent of `showModifierLabels`. Once and limited
 variants share their family's symbol; labels and tooltips retain their details.
+Matching batch explosions (`!m`) use a burst with two matching pips. The
+slashed burst marks a failed batch (`!mf`), where the modifier resets the pool's
+score to zero. Each badge appears on the dice flagged by the core.
+
 Icons represent actual result flags, rather than every modifier in the notation.
 A uniqueness icon means a duplicate was rerolled, not that uniqueness is guaranteed.
 Group modifier labels are smaller captions centred beneath the whole member and wrap
 within its width. Group member flags are displayed on that member, without repeating them on every
 nested die. Icons wrap into additional rows when needed.
+
+Calculated keep and drop quantities appear as captions centred beneath the pool
+or group they apply to. For example, `5d6kh($keep + 1)` with `$keep` set to 2 shows
+**Keep highest 3**. Hover the caption or the enclosing pool or group to see
+`kh($keep+1) → 3`. These values come from the evaluated result, including when
+the quantity expression rolls its own dice. The pool or group tooltip still
+shows the calculation if `showModifierLabels` is false.
+
+Each `.calculated-selection-label` has `data-modifier-index` (its index in the
+owning node's modifier array), `data-notation` and `data-quantity`. The evaluated
+quantity can exceed the number of items available. The existing counted and
+dropped markers show the actual outcome.
 
 Corner placement cuts transparent circular gaps out of the artwork behind each
 symbol. It does not paint a background colour. Below placement generates no
@@ -220,7 +342,8 @@ Every render generates unique mask identifiers, so multiple outputs can share a
 page safely. Keep the generated definitions with their SVG.
 
 Each icon has `data-modifier` and a matching `modifier-*` class. Values are:
-`explode`, `compound`, `penetrate`, `re-roll`, `unique`, `min`, `max`,
+`explode`, `explode-matching-batch`, `explode-matching-batch-failure`,
+`compound`, `penetrate`, `re-roll`, `unique`, `min`, `max`,
 `target-success`, `target-failure`, `critical-success`, and `critical-failure`.
 Icons remain meaningful in monochrome. Colours can be overridden with CSS:
 
@@ -238,4 +361,4 @@ Icons remain meaningful in monochrome. Colours can be overridden with CSS:
 
 Every icon family supports `--modifier-{data-modifier}-color`. Compound's rear
 burst follows `--modifier-explode-color`. The demo includes placement, visibility
-and monochrome controls, plus fixed examples of every modifier family.
+and monochrome controls, plus seeded real examples of the modifier families supported by the installed core.
