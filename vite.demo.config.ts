@@ -26,6 +26,12 @@ export default defineConfig({
           new URL("./packages/svg/src/index.ts", import.meta.url),
         ),
       },
+      {
+        find: /^@dice-roller\/terminal-presenter$/,
+        replacement: fileURLToPath(
+          new URL("./packages/terminal/src/index.ts", import.meta.url),
+        ),
+      },
     ],
   },
   server: { host: "127.0.0.1" },

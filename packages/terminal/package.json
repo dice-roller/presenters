@@ -1,0 +1,40 @@
+{
+  "name": "@dice-roller/terminal-presenter",
+  "version": "0.0.0",
+  "description": "ANSI-styled text results for RPG Dice Roller.",
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dice-roller/presenters.git",
+    "directory": "packages/terminal"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tests/tsconfig.json",
+    "test": "npm run build && node --import tsx --test tests/*.test.ts",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@dice-roller/rpg-dice-roller": ">=6.0.0-beta.7"
+  },
+  "devDependencies": {
+    "@dice-roller/rpg-dice-roller": "^6.0.0-beta.7"
+  }
+}

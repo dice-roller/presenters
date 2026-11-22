@@ -3,14 +3,16 @@
 Optional TypeScript presenters for [RPG Dice Roller](https://github.com/dice-roller/rpg-dice-roller).
 
 One repository, independently published npm packages. The repository root is private
-and is never published. Only the SVG presenter exists so far; it is not yet released.
+and is never published.
 
-| Workspace      | npm package                  | Local demo |
-| -------------- | ---------------------------- | ---------- |
-| `packages/svg` | `@dice-roller/svg-presenter` | `/svg/`    |
+| Workspace           | npm package                       | Local demo   |
+| ------------------- | --------------------------------- | ------------ |
+| `packages/svg`      | `@dice-roller/svg-presenter`      | `/svg/`      |
+| `packages/terminal` | `@dice-roller/terminal-presenter` | `/terminal/` |
 
 See the [SVG presenter guide](packages/svg/README.md) for usage, appearance,
-modifier flags, metadata and hover behaviour.
+modifier flags, metadata and hover behaviour. See the
+[terminal presenter guide](packages/terminal/README.md) for ANSI styling and plain text output.
 
 ## Local development
 
@@ -22,7 +24,7 @@ npm run dev
 ```
 
 Open the URL Vite prints. `/` lists the presenters; `/svg/` contains the artwork
-gallery and all existing result examples. Each presenter has its own demo page.
+gallery and SVG examples. `/terminal/` shows example rolls with ANSI styling.
 The demo is for local development and has no deployment workflow. Its result
 examples are real dice roller `Roll` instances created from notation and fixed
 RNG seeds, evaluated once and reused for appearance changes. Static artwork/legend samples remain separate from roll examples.

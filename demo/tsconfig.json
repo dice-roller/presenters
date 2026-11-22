@@ -7,8 +7,14 @@
     "types": ["vite/client"],
     "noEmit": true,
     "paths": {
-      "@dice-roller/svg-presenter": ["../packages/svg/src/index.ts"]
+      "@dice-roller/svg-presenter": ["../packages/svg/src/index.ts"],
+      "@dice-roller/terminal-presenter": ["../packages/terminal/src/index.ts"]
     }
   },
-  "include": ["./**/*.ts", "./**/*.vue", "../packages/svg/src/**/*.ts"]
+  "include": [
+    "./**/*.ts",
+    "./**/*.vue",
+    "../packages/svg/src/**/*.ts",
+    "../packages/terminal/src/**/*.ts"
+  ]
 }
