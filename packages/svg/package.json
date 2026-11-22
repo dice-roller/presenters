@@ -1,6 +1,6 @@
 {
   "name": "@dice-roller/svg-presenter",
-  "version": "0.0.0",
+  "version": "1.0.0-beta.5",
   "description": "CSS-stylable SVG results for RPG Dice Roller.",
   "type": "module",
   "sideEffects": false,
@@ -34,9 +34,9 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "@dice-roller/rpg-dice-roller": ">=6.0.0-0"
+    "@dice-roller/rpg-dice-roller": ">=6.0.0-beta.7"
   },
   "devDependencies": {
-    "@dice-roller/rpg-dice-roller": "^6.0.0-beta.5"
+    "@dice-roller/rpg-dice-roller": "^6.0.0-beta.7"
   }
 }

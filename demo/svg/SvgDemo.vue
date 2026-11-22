@@ -2,17 +2,21 @@
 import { computed, ref } from "vue";
 import DemoNav from "../DemoNav.vue";
 import { diceArtwork } from "./dice-artwork.js";
-import { SvgPresenter } from "@dice-roller/svg-presenter";
 import {
-  sampleResult,
-  sampleRoll,
-} from "../../packages/svg/tests/fixtures/sample-result.js";
+  createRollExample,
+  createRollExamples,
+  createExampleHistory,
+  decisionExampleDefinitions,
+  singleRollDefinition,
+} from "./roll-examples.js";
+import { SvgPresenter } from "@dice-roller/svg-presenter";
 import { fillValueSlot } from "../../packages/svg/src/value-slot.js";
 import {
   modifierIcons,
   modifierIconStyles,
   renderModifierIcon,
 } from "../../packages/svg/src/modifier-icons.js";
+
 const { d2, d4, d6, d8, d10, d12, d20, generic } = diceArtwork;
 
 const stroke = ref("#7962b5");
@@ -21,12 +25,15 @@ const filled = ref(false);
 const showValues = ref(true);
 const showDescriptions = ref(true);
 const showDiceLabels = ref(true);
+const showVariableLabels = ref(true);
 const showModifierLabels = ref(true);
 const showModifierIcons = ref(true);
 const modifierIconPosition = ref<"corner" | "below">("corner");
 const monochromeModifiers = ref(false);
 const showNotation = ref(true);
 const showTotals = ref(true);
+const width = ref(1040);
+const noWrap = ref(false);
 const sizes = {
   "x-small": 40,
   small: 80,
@@ -58,14 +65,18 @@ const icons = [
 
 const presenter = computed(
   () =>
-    new SvgPresenter(diceArtwork, {
+    new SvgPresenter({
       size: sizes[size.value],
+      width:
+        Number.isFinite(width.value) && width.value > 48 ? width.value : 1040,
+      noWrap: noWrap.value,
       stroke: stroke.value,
       fill: fill.value,
       filled: filled.value,
       showValues: showValues.value,
       showDescriptions: showDescriptions.value,
       showDiceLabels: showDiceLabels.value,
+      showVariableLabels: showVariableLabels.value,
       showModifierLabels: showModifierLabels.value,
       showModifierIcons: showModifierIcons.value,
       modifierIconPosition: modifierIconPosition.value,
@@ -73,14 +84,44 @@ const presenter = computed(
       showTotals: showTotals.value,
     }),
 );
-const singlePreview = computed(() => presenter.value.present(sampleRoll));
-const preview = computed(() => presenter.value.present(sampleResult));
+// Evaluate once when this playground mounts. Appearance controls only present.
+const examples = createRollExamples();
+const singleExample = createRollExample(singleRollDefinition);
+const history = createExampleHistory(examples);
+const decisionHistory = createExampleHistory(
+  decisionExampleDefinitions.map(createRollExample),
+);
+const singlePreview = computed(() =>
+  singleExample.roll.present(presenter.value),
+);
+const preview = computed(() => history.present(presenter.value));
+const decisionPreview = computed(() =>
+  decisionHistory.present(presenter.value),
+);
+// Serialise result trees directly: Roll.toJSON() also calculates extrema.
+const resultTrees = examples.map(({ id, data, roll }) => ({
+  id,
+  data,
+  notation: roll.notation,
+  total: roll.total,
+  result: roll.result,
+}));
 
 const modifierLegend = [
   {
     flag: "explode",
     label: "Explode",
     detail: "Triggered an additional roll.",
+  },
+  {
+    flag: "explode-matching-batch",
+    label: "Matching batch explosion",
+    detail: "The matching dice triggered another batch.",
+  },
+  {
+    flag: "explode-matching-batch-failure",
+    label: "Matching batch failure",
+    detail: "The matching batch reset the pool score to zero.",
   },
   {
     flag: "compound",
@@ -147,6 +188,7 @@ const modifierLegend = [
         `modifier-legend-${index}`,
       )
     : `<g opacity=".4" fill="none" stroke="currentColor" stroke-width="2.2"><g transform="translate(3 3) scale(.3)">${fillValueSlot(artwork(d6), "4")}<path d="M14 50h72"/></g></g>`;
+
   return {
     ...entry,
     symbol: `<svg class="result-preview" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 36" width="45" height="36" aria-hidden="true"><style>${modifierIconStyles}</style>${symbol}</svg>`,
@@ -175,6 +217,20 @@ const modifierLegend = [
           </option>
         </select>
       </label>
+      <label>
+        SVG width
+        <input
+          v-model.number="width"
+          type="number"
+          min="49"
+          step="10"
+          :disabled="noWrap"
+        />
+      </label>
+      <label
+        ><input v-model="noWrap" type="checkbox" /> Keep each roll on one
+        line</label
+      >
       <label>Outline colour <input v-model="stroke" type="color" /></label>
       <label>Fill colour <input v-model="fill" type="color" /></label>
       <label><input v-model="filled" type="checkbox" /> Fill dice</label>
@@ -187,6 +243,10 @@ const modifierLegend = [
         ><input v-model="showDiceLabels" type="checkbox" /> Show dice
         labels</label
       >
+      <label>
+        <input v-model="showVariableLabels" type="checkbox" /> Show variable
+        labels
+      </label>
       <label
         ><input v-model="showModifierLabels" type="checkbox" /> Show modifier
         labels</label
@@ -254,6 +314,7 @@ const modifierLegend = [
       >
         <li v-for="entry in modifierLegend" :key="entry.flag">
           <span class="modifier-legend-symbol" v-html="entry.symbol" />
+
           <div>
             <strong>{{ entry.label }}</strong>
             <code>{{ entry.flag }}</code>
@@ -261,6 +322,7 @@ const modifierLegend = [
           </div>
         </li>
       </ul>
+
       <p>
         Flags can combine, for example compound and penetrate. Once variants
         share their family's icon. Keep marks excluded results as dropped;
@@ -272,8 +334,8 @@ const modifierLegend = [
     <section class="presenter-preview" aria-labelledby="single-roll-heading">
       <h2 id="single-roll-heading">Single roll preview</h2>
       <p>
-        <code>2d20! + 3d8kh</code>: one d20 explodes for an extra roll, and only
-        the highest d8 contributes to the total.
+        <code>{{ singleExample.roll.notation }}</code
+        >: exploding d20s and only the highest d8 contributes to the total.
       </p>
       <div
         class="preview-output"
@@ -283,17 +345,18 @@ const modifierLegend = [
         v-html="singlePreview"
       />
       <details>
-        <summary>Fixed single roll object</summary>
-        <pre>{{ JSON.stringify(sampleRoll, null, 2) }}</pre>
+        <summary>Dice roller single-roll result</summary>
+        <pre>{{ JSON.stringify(singleExample.roll.result, null, 2) }}</pre>
       </details>
     </section>
 
     <section class="presenter-preview" aria-labelledby="presenter-heading">
       <h2 id="presenter-heading">Presenter output preview</h2>
       <p>
-        A fixed result object showing mixed dice, arithmetic, parentheses,
-        functions, custom dice, keep/drop, explosions, rerolls, targets and
-        criticals. Appearance changes reuse these results.
+        Real seeded rolls showing mixed dice, arithmetic, parentheses,
+        functions, custom dice, keep/drop, explosions, rerolls, targets,
+        criticals and caller data variables. Appearance changes reuse these
+        results.
       </p>
       <p>
         Hover a pool, an operator between pools, or a group brace to highlight
@@ -309,9 +372,19 @@ const modifierLegend = [
         v-html="preview"
       />
       <details>
-        <summary>Fixed result object</summary>
-        <pre>{{ JSON.stringify(sampleResult, null, 2) }}</pre>
+        <summary>Dice roller inputs and result trees</summary>
+        <pre>{{ JSON.stringify(resultTrees, null, 2) }}</pre>
       </details>
+    </section>
+    <section class="presenter-preview" aria-labelledby="decisions-heading">
+      <h2 id="decisions-heading">Comparisons and conditional rolls</h2>
+      <div
+        class="preview-output"
+        :class="{ 'monochrome-modifiers': monochromeModifiers }"
+        tabindex="0"
+        aria-label="Scrollable comparison and conditional results"
+        v-html="decisionPreview"
+      />
     </section>
   </main>
 </template>

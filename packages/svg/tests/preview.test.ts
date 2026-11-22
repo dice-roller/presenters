@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { Roll, RollHistory } from "@dice-roller/rpg-dice-roller";
 import type { Presenter } from "@dice-roller/rpg-dice-roller";
 import { renderSvg, SvgPresenter } from "../dist/index.js";
-import { sampleResult, sampleRoll } from "./fixtures/sample-result.js";
+import { sampleResult, sampleRoll } from "./fixtures/rendering-results.js";
 
 const artwork = Object.fromEntries(
   ["d2", "d4", "d6", "d8", "d10", "d12", "d20", "generic"].map((name) => [
@@ -25,7 +25,7 @@ const appearance = {
 
 test("functions and mathematical parentheses expose their own matching delimiters", () => {
   const svg = new Roll("max(floor((d8+3)/2), (d4+1))").present(
-    new SvgPresenter(artwork, appearance),
+    new SvgPresenter({ ...appearance, artwork: artwork }),
   );
   assert.equal((svg.match(/data-math-group="function"/g) ?? []).length, 2);
   assert.equal((svg.match(/data-math-group="parentheses"/g) ?? []).length, 2);
@@ -50,7 +50,9 @@ test("functions and mathematical parentheses expose their own matching delimiter
 });
 
 test("dice-pool parentheses stay outside mathematical matching highlights", () => {
-  const svg = new SvgPresenter(artwork, appearance).present(sampleRoll);
+  const svg = new SvgPresenter({ ...appearance, artwork: artwork }).present(
+    sampleRoll,
+  );
   assert.doesNotMatch(svg, /data-math-group=/);
   assert.doesNotMatch(svg, /data-delimiter=/);
   assert.equal((svg.match(/data-pool="true"/g) ?? []).length, 2);
@@ -68,9 +70,11 @@ test("parentheses inserted to preserve precedence are also matched", () => {
     node: { ...result.node, left: result.left.inner.node },
   };
   for (const size of [40, 140, 400]) {
-    const svg = new SvgPresenter(artwork, { ...appearance, size }).present(
-      unwrapped,
-    );
+    const svg = new SvgPresenter({
+      ...appearance,
+      size,
+      artwork: artwork,
+    }).present(unwrapped);
     assert.equal((svg.match(/data-math-group="parentheses"/g) ?? []).length, 1);
     assert.equal((svg.match(/data-delimiter="open"/g) ?? []).length, 1);
     assert.equal((svg.match(/data-delimiter="close"/g) ?? []).length, 1);
@@ -81,11 +85,12 @@ test("parentheses inserted to preserve precedence are also matched", () => {
 test("hover regions follow nested groups, members and pools without intercepting their children", () => {
   for (const modifierIconPosition of ["corner", "below"] as const) {
     const svg = new Roll("{{d6 + d8, d10}, d4}kh1").present(
-      new SvgPresenter(artwork, {
+      new SvgPresenter({
         ...appearance,
         modifierIconPosition,
         showModifierIcons: false,
         showModifierLabels: false,
+        artwork: artwork,
       }),
     );
     assert.equal((svg.match(/class="roll-group-result"/g) ?? []).length, 2);
@@ -108,14 +113,14 @@ test("hover regions follow nested groups, members and pools without intercepting
     // Suppression includes nested groups as well as pools and members.
     assert.ok(
       svg.includes(
-        ":hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result):hover))>.result-hover-outline",
+        ":hover:not(:has(:is(.dice-pool-result,.group-member-result,.roll-group-result,.comparison-result,.conditional-result,.conditional-part-result):hover))>.result-hover-outline",
       ),
     );
   }
 });
 
 test("multi-pool group example exposes outlines at all three levels", () => {
-  const svg = new SvgPresenter(artwork, appearance).present(
+  const svg = new SvgPresenter({ ...appearance, artwork: artwork }).present(
     sampleResult.rolls[18]!,
   );
   assert.equal((svg.match(/class="roll-group-result"/g) ?? []).length, 1);
@@ -138,7 +143,10 @@ test("SvgPresenter plugs into real v6 rolls and histories without rolling again"
     },
   });
   const before = calls;
-  const presenter: Presenter<string> = new SvgPresenter(artwork, appearance);
+  const presenter: Presenter<string> = new SvgPresenter({
+    ...appearance,
+    artwork: artwork,
+  });
   assert.ok(roll.present(presenter).includes(`Total: ${roll.total}`));
   const history = new RollHistory();
   history.add(roll, new Roll("3+4"));
@@ -216,7 +224,7 @@ test("pools use parentheses and addition with balanced spacing at every demo siz
   const roll = new Roll("2d6");
   for (const size of [40, 80, 140, 200, 400]) {
     const svg = roll.present(
-      new SvgPresenter(artwork, { ...appearance, size }),
+      new SvgPresenter({ ...appearance, size, artwork: artwork }),
     );
     const centres = [...svg.matchAll(/<svg x="([\d.]+)"[^>]*width="/g)].map(
       (match) => Number(match[1]) + size / 2,
@@ -259,7 +267,7 @@ test("example eight displays a custom two-faced die as a coin", () => {
 });
 
 test("single rolls omit history numbering and totals, even when a history has one roll", () => {
-  const presenter = new SvgPresenter(artwork, appearance);
+  const presenter = new SvgPresenter({ ...appearance, artwork: artwork });
   for (const roll of [sampleRoll, new Roll("2d20! + 3d8kh1")]) {
     const svg = presenter.present(roll);
     assert.ok(svg.includes(`class="notation">${roll.notation}</text>`));
@@ -276,9 +284,15 @@ test("nested descriptions belong to their group or pool and can be hidden", () =
     "{d6 [First <choice>], d8 [Second]}kh1 [Outer\nSecond line] + d4 // Inline label",
   );
   const before = JSON.stringify(roll.result);
-  const shown = roll.present(new SvgPresenter(artwork, appearance));
+  const shown = roll.present(
+    new SvgPresenter({ ...appearance, artwork: artwork }),
+  );
   const hidden = roll.present(
-    new SvgPresenter(artwork, { ...appearance, showDescriptions: false }),
+    new SvgPresenter({
+      ...appearance,
+      showDescriptions: false,
+      artwork: artwork,
+    }),
   );
   for (const text of [
     "First &lt;choice&gt;",
@@ -299,13 +313,14 @@ test("long descriptions wrap rather than shrinking dice or overlapping the total
   const roll = new Roll(`d6 [${"A long description ".repeat(30)}]`);
   for (const size of [40, 140, 400]) {
     const shown = roll.present(
-      new SvgPresenter(artwork, { ...appearance, size }),
+      new SvgPresenter({ ...appearance, size, artwork: artwork }),
     );
     const hidden = roll.present(
-      new SvgPresenter(artwork, {
+      new SvgPresenter({
         ...appearance,
         size,
         showDescriptions: false,
+        artwork: artwork,
       }),
     );
     const height = (svg: string) => Number(svg.match(/height="([\d.]+)"/)![1]);
@@ -316,9 +331,11 @@ test("long descriptions wrap rather than shrinking dice or overlapping the total
 });
 
 test("a text-only continuation row leaves space before the total", () => {
-  const svg = new SvgPresenter(artwork, { ...appearance, size: 400 }).present(
-    sampleResult.rolls[6]!,
-  );
+  const svg = new SvgPresenter({
+    ...appearance,
+    size: 400,
+    artwork: artwork,
+  }).present(sampleResult.rolls[6]!);
   const math = [
     ...svg.matchAll(
       /<text x="[\d.]+" y="([\d.]+)" class="math"[^>]*font-size="([\d.]+)"/g,
@@ -334,7 +351,7 @@ test("a text-only continuation row leaves space before the total", () => {
 });
 
 test("single rolls end after their total, without a history divider or spacer", () => {
-  const presenter = new SvgPresenter(artwork, appearance);
+  const presenter = new SvgPresenter({ ...appearance, artwork: artwork });
   const svg = presenter.present(sampleRoll);
   assert.doesNotMatch(svg, /<path[^>]*class="divider"/);
   const height = Number(svg.match(/height="([\d.]+)"/)![1]);
@@ -349,7 +366,7 @@ test("block descriptions are centred over their own dice, even when wider than t
   for (const size of [40, 140, 400]) {
     const roll = new Roll("d12 [Weapon damage] + d20 [Alternative]");
     const svg = roll.present(
-      new SvgPresenter(artwork, { ...appearance, size }),
+      new SvgPresenter({ ...appearance, size, artwork: artwork }),
     );
     const dice = [...svg.matchAll(/<svg x="([\d.]+)" y="([\d.]+)" width="/g)];
     const headings = [
@@ -370,7 +387,9 @@ test("block descriptions are centred over their own dice, even when wider than t
 
 test("nested group and pool descriptions each use the centre of their own scope", () => {
   const roll = new Roll("{d12 [Weapon damage], d20} [Whole group]");
-  const svg = roll.present(new SvgPresenter(artwork, appearance));
+  const svg = roll.present(
+    new SvgPresenter({ ...appearance, artwork: artwork }),
+  );
   const dice = [...svg.matchAll(/<svg x="([\d.]+)" y="([\d.]+)" width="/g)];
   const headings = [
     ...svg.matchAll(/<tspan x="([\d.]+)" y="([\d.]+)">([^<]+)<\/tspan>/g),
@@ -402,9 +421,11 @@ test("nested group and pool descriptions each use the centre of their own scope"
 
 test("group headings span the complete group including inline labels and drop badges", () => {
   for (const size of [40, 140]) {
-    const svg = new SvgPresenter(artwork, { ...appearance, size }).present(
-      sampleResult.rolls[6]!,
-    );
+    const svg = new SvgPresenter({
+      ...appearance,
+      size,
+      artwork: artwork,
+    }).present(sampleResult.rolls[6]!);
     const heading = svg.match(
       /<tspan x="([\d.]+)"[^>]*>Keep the higher result<\/tspan>/,
     )!;
@@ -429,7 +450,7 @@ test("group headings span the complete group including inline labels and drop ba
 
 test("dice expose semantic types, face counts and their actual artwork independently", () => {
   const svg = new Roll("d20 + d% + dF + d13").present(
-    new SvgPresenter(artwork, appearance),
+    new SvgPresenter({ ...appearance, artwork: artwork }),
   );
   for (const attributes of [
     'data-die-type="standard" data-faces="20" data-notation="d20" data-shape="d20"',
@@ -438,7 +459,7 @@ test("dice expose semantic types, face counts and their actual artwork independe
     'data-die-type="standard" data-faces="13" data-notation="d13" data-shape="generic"',
   ])
     assert.ok(svg.includes(attributes), attributes);
-  const custom = new SvgPresenter(artwork, appearance).present(
+  const custom = new SvgPresenter({ ...appearance, artwork: artwork }).present(
     sampleResult.rolls[7]!,
   );
   assert.ok(
@@ -449,9 +470,10 @@ test("dice expose semantic types, face counts and their actual artwork independe
 });
 
 test("metadata keeps numeric values, flags and effective exclusion when visible values are hidden", () => {
-  const svg = new SvgPresenter(artwork, {
+  const svg = new SvgPresenter({
     ...appearance,
     showValues: false,
+    artwork: artwork,
   }).present(sampleResult);
   const dice = [
     ...svg.matchAll(/<g class="(?:included|excluded)"( data-die-type=[^>]+)>/g),
@@ -492,7 +514,7 @@ test("custom die names and notation are escaped in metadata attributes", () => {
   assert.equal(result.type, "pool");
   if (result.type !== "pool") return;
   const unsafe = 'custom" onload="alert(1)<&';
-  const svg = new SvgPresenter(artwork, appearance).present({
+  const svg = new SvgPresenter({ ...appearance, artwork: artwork }).present({
     notation: "Custom die",
     total: result.value,
     result: {
@@ -510,7 +532,10 @@ test("custom die names and notation are escaped in metadata attributes", () => {
 test("label, notation and total visibility options work independently for rolls and histories", () => {
   for (const target of [sampleRoll, sampleResult]) {
     const before = JSON.stringify(target);
-    const baseline = new SvgPresenter(artwork, appearance).present(target);
+    const baseline = new SvgPresenter({
+      ...appearance,
+      artwork: artwork,
+    }).present(target);
     for (let combination = 0; combination < 16; combination++) {
       const options = {
         showDiceLabels: Boolean(combination & 1),
@@ -518,9 +543,10 @@ test("label, notation and total visibility options work independently for rolls 
         showNotation: Boolean(combination & 4),
         showTotals: Boolean(combination & 8),
       };
-      const svg = new SvgPresenter(artwork, {
+      const svg = new SvgPresenter({
         ...appearance,
         ...options,
+        artwork: artwork,
       }).present(target);
       assert.equal(
         /<text[^>]*class="caption"/.test(svg),
@@ -564,9 +590,10 @@ test("label, notation and total visibility options work independently for rolls 
 
 test("modifier icons cover the result families and remain independent of labels", () => {
   const before = JSON.stringify(sampleResult);
-  const shown = new SvgPresenter(artwork, {
+  const shown = new SvgPresenter({
     ...appearance,
     showModifierLabels: false,
+    artwork: artwork,
   }).present(sampleResult);
   for (const kind of [
     "explode",
@@ -583,9 +610,10 @@ test("modifier icons cover the result families and remain independent of labels"
   ])
     assert.ok(shown.includes(`data-modifier="${kind}"`), kind);
   assert.doesNotMatch(shown, /<text[^>]*class="badge"/);
-  const hidden = new SvgPresenter(artwork, {
+  const hidden = new SvgPresenter({
     ...appearance,
     showModifierIcons: false,
+    artwork: artwork,
   }).present(sampleResult);
   assert.ok(!hidden.includes("data-modifier="));
   assert.ok(!hidden.includes('class="modifier-cutout"'));
@@ -598,10 +626,11 @@ test("modifier icons cover the result families and remain independent of labels"
 test("corner icons straddle the top edge with circular transparent cutouts; below icons have none", () => {
   for (const size of [40, 80, 140, 200, 400]) {
     for (const modifierIconPosition of ["corner", "below"] as const) {
-      const svg = new SvgPresenter(artwork, {
+      const svg = new SvgPresenter({
         ...appearance,
         size,
         modifierIconPosition,
+        artwork: artwork,
       }).present(sampleRoll);
       const die = svg.match(/<svg x="([\d.]+)" y="([\d.]+)" width="/)!;
       const badge = svg.match(
@@ -635,9 +664,10 @@ test("corner icons straddle the top edge with circular transparent cutouts; belo
 });
 
 test("compound/penetrate uses separate open symbols with a masked amber rear burst", () => {
-  const svg = new SvgPresenter(artwork, {
+  const svg = new SvgPresenter({
     ...appearance,
     modifierIconPosition: "below",
+    artwork: artwork,
   }).present(sampleResult.rolls[10]!);
   assert.equal((svg.match(/data-modifier="compound"/g) ?? []).length, 1);
   assert.equal((svg.match(/data-modifier="penetrate"/g) ?? []).length, 1);
@@ -655,7 +685,7 @@ test("once variants share family icons and do not claim that uniqueness is guara
     [12, "unique", "unique-once"],
     [13, "re-roll", "re-roll-once"],
   ] as const) {
-    const svg = new SvgPresenter(artwork, appearance).present(
+    const svg = new SvgPresenter({ ...appearance, artwork: artwork }).present(
       sampleResult.rolls[index]!,
     );
     assert.equal(
@@ -664,7 +694,7 @@ test("once variants share family icons and do not claim that uniqueness is guara
     );
     assert.ok(svg.includes(`data-flags="${flag}"`));
   }
-  const svg = new SvgPresenter(artwork, appearance).present(
+  const svg = new SvgPresenter({ ...appearance, artwork: artwork }).present(
     sampleResult.rolls[12]!,
   );
   assert.match(svg, /aria-label="Re-rolled for uniqueness"/);
@@ -672,9 +702,10 @@ test("once variants share family icons and do not claim that uniqueness is guara
 
 test("group member icons attach to their member rather than every nested die", () => {
   for (const modifierIconPosition of ["corner", "below"] as const) {
-    const svg = new SvgPresenter(artwork, {
+    const svg = new SvgPresenter({
       ...appearance,
       modifierIconPosition,
+      artwork: artwork,
     }).present(sampleResult.rolls[15]!);
     assert.equal((svg.match(/data-group-member="true"/g) ?? []).length, 2);
     for (const kind of [
@@ -696,11 +727,12 @@ test("group member icons attach to their member rather than every nested die", (
 test("group outcome icons end at the dice corner and flow left regardless of labels", () => {
   for (const size of [40, 140, 400]) {
     for (const showModifierLabels of [true, false]) {
-      const svg = new SvgPresenter(artwork, {
+      const svg = new SvgPresenter({
         ...appearance,
         size,
         showModifierLabels,
         modifierIconPosition: "corner",
+        artwork: artwork,
       }).present(sampleResult.rolls[15]!);
       const members = svg.split('class="group-member-result"').slice(1);
       assert.equal(members.length, 2);
@@ -735,11 +767,12 @@ test("group modifier labels are smaller centred captions without horizontal labe
   for (const size of [40, 140]) {
     for (const modifierIconPosition of ["corner", "below"] as const) {
       const presenter = (showModifierLabels: boolean) =>
-        new SvgPresenter(artwork, {
+        new SvgPresenter({
           ...appearance,
           size,
           modifierIconPosition,
           showModifierLabels,
+          artwork: artwork,
         }).present(sampleResult.rolls[15]!);
       const shown = presenter(true);
       const hidden = presenter(false);
@@ -785,7 +818,9 @@ test("keep and drop group examples exclude complete multi-dice members", () => {
     const roll = sampleResult.rolls[index]!;
     assert.equal(roll.notation, notation);
     assert.equal(roll.total, 11);
-    const svg = new SvgPresenter(artwork, appearance).present(roll);
+    const svg = new SvgPresenter({ ...appearance, artwork: artwork }).present(
+      roll,
+    );
     assert.equal((svg.match(/data-group-member="true"/g) ?? []).length, 2);
     assert.equal(
       (svg.match(/data-excluded="true" data-flags=""/g) ?? []).length,
@@ -803,10 +838,11 @@ test("keep and drop group examples exclude complete multi-dice members", () => {
 test("group member blank spaces have a transparent hit area behind dice and icons", () => {
   for (const modifierIconPosition of ["corner", "below"] as const) {
     for (const size of [40, 140]) {
-      const svg = new SvgPresenter(artwork, {
+      const svg = new SvgPresenter({
         ...appearance,
         size,
         modifierIconPosition,
+        artwork: artwork,
       }).present(sampleResult.rolls[15]!);
       for (const member of svg.split('class="group-member-result"').slice(1)) {
         const hit = member.match(
@@ -845,11 +881,12 @@ test("every group member has its own title and hit area regardless of modifier v
   for (const modifierIconPosition of ["corner", "below"] as const) {
     for (const showModifierLabels of [true, false]) {
       for (const showModifierIcons of [true, false]) {
-        const presenter = new SvgPresenter(artwork, {
+        const presenter = new SvgPresenter({
           ...appearance,
           modifierIconPosition,
           showModifierLabels,
           showModifierIcons,
+          artwork: artwork,
         });
         for (const [target, expected] of [
           [sampleResult.rolls[6]!, 2],
@@ -870,7 +907,7 @@ test("every group member has its own title and hit area regardless of modifier v
 });
 
 test("mask identifiers are unique across outputs and all references resolve", () => {
-  const presenter = new SvgPresenter(artwork, appearance);
+  const presenter = new SvgPresenter({ ...appearance, artwork: artwork });
   const svg = presenter.present(sampleResult) + presenter.present(sampleResult);
   const identifiers = [...svg.matchAll(/\bid="([^"]+)"/g)].map(
     (match) => match[1]!,
@@ -909,10 +946,11 @@ test("many modifiers wrap safely on small dice and location changes preserve all
   const before = JSON.stringify(roll);
   for (const size of [20, 40, 140, 400]) {
     for (const modifierIconPosition of ["corner", "below"] as const) {
-      const svg = new SvgPresenter(artwork, {
+      const svg = new SvgPresenter({
         ...appearance,
         size,
         modifierIconPosition,
+        artwork: artwork,
       }).present(roll);
       const die = svg.match(/<svg x="([\d.]+)" y="([\d.]+)" width="/)!;
       const badges = [
@@ -946,10 +984,11 @@ test("many modifiers wrap safely on small dice and location changes preserve all
 
 test("hiding icons removes layout and masks regardless of position; invalid positions are rejected", () => {
   const presenter = (modifierIconPosition: "corner" | "below") =>
-    new SvgPresenter(artwork, {
+    new SvgPresenter({
       ...appearance,
       modifierIconPosition,
       showModifierIcons: false,
+      artwork: artwork,
     });
   assert.equal(
     presenter("corner").present(sampleRoll),
@@ -957,8 +996,9 @@ test("hiding icons removes layout and masks regardless of position; invalid posi
   );
   assert.throws(
     () =>
-      new SvgPresenter(artwork, {
+      new SvgPresenter({
         modifierIconPosition: "invalid" as "corner",
+        artwork: artwork,
       }).present(sampleRoll),
     /Invalid modifier icon position/,
   );
@@ -966,7 +1006,9 @@ test("hiding icons removes layout and masks regardless of position; invalid posi
 
 test("pool wrappers expose initial quantity, resulting dice and pool totals", () => {
   const before = JSON.stringify(sampleRoll);
-  const svg = new SvgPresenter(artwork, appearance).present(sampleRoll);
+  const svg = new SvgPresenter({ ...appearance, artwork: artwork }).present(
+    sampleRoll,
+  );
   const pools = svg.split('class="dice-pool-result"').slice(1);
   assert.equal(pools.length, 2);
   assert.match(
@@ -987,7 +1029,7 @@ test("pool wrappers expose initial quantity, resulting dice and pool totals", ()
 test("pool hover areas sit behind dice and cover parentheses and descriptions", () => {
   for (const size of [40, 140, 400]) {
     const svg = new Roll("2d6 [Example]").present(
-      new SvgPresenter(artwork, { ...appearance, size }),
+      new SvgPresenter({ ...appearance, size, artwork: artwork }),
     );
     const pool = svg.split('class="dice-pool-result"')[1]!;
     const hit = pool.match(
@@ -1018,7 +1060,7 @@ test("pool hover areas sit behind dice and cover parentheses and descriptions", 
 
 test("group exclusion and hidden labels preserve pool metadata and its own value", () => {
   for (const modifierIconPosition of ["corner", "below"] as const) {
-    const svg = new SvgPresenter(artwork, {
+    const svg = new SvgPresenter({
       ...appearance,
       modifierIconPosition,
       showValues: false,
@@ -1028,6 +1070,7 @@ test("group exclusion and hidden labels preserve pool metadata and its own value
       showDescriptions: false,
       showNotation: false,
       showTotals: false,
+      artwork: artwork,
     }).present(sampleResult.rolls[6]!);
     assert.equal((svg.match(/data-group-member="true"/g) ?? []).length, 2);
     assert.equal((svg.match(/data-pool="true"/g) ?? []).length, 2);
